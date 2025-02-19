@@ -146,7 +146,7 @@
 
         async function fetchData() {
             try {
-                const response = await fetch('http://localhost:3040/api/prices');
+                const response = await fetch('/api/prices');
                 const data = await response.json();
                 updateChart(data);
             } catch (error) {
@@ -323,7 +323,7 @@
         // 获取 Binance 数据的函数
         async function fetchBinanceData() {
             try {
-                const response = await fetch('http://localhost:3040/api/binance-prices');
+                const response = await fetch('/api/binance-prices');
                 const data = await response.json();
                 updateBinanceChart(data);
             } catch (error) {
