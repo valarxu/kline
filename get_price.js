@@ -81,7 +81,8 @@ async function getTokenPrice(tokenName, tokenAddress) {
             const prices = response.data.data[0].prices;
             if (prices.length > 0) {
                 const basePrice = parseFloat(prices[prices.length - 1].price);
-                const pricesWithPercentage = prices.map(item => ({
+                const reversedPrices = [...prices].reverse();
+                const pricesWithPercentage = reversedPrices.map(item => ({
                     ...item,
                     percentageChange: ((parseFloat(item.price) - basePrice) / basePrice) * 100
                 }));
@@ -115,7 +116,7 @@ async function getBinanceTokenKlines(token) {
         });
 
         if (response.data && Array.isArray(response.data)) {
-            const basePrice = parseFloat(response.data[response.data.length - 1][4]);
+            const basePrice = parseFloat(response.data[0][4]);
             const processedData = response.data.map(kline => ({
                 time: kline[0].toString(),
                 price: kline[4],
