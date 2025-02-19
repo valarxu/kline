@@ -80,9 +80,8 @@ async function getTokenPrice(tokenName, tokenAddress) {
         if (response.data && response.data.data && response.data.data[0] && response.data.data[0].prices) {
             const prices = response.data.data[0].prices;
             if (prices.length > 0) {
-                const basePrice = parseFloat(prices[prices.length - 1].price);
-                const reversedPrices = [...prices].reverse();
-                const pricesWithPercentage = reversedPrices.map(item => ({
+                const basePrice = parseFloat(prices[0].price);
+                const pricesWithPercentage = prices.map(item => ({
                     ...item,
                     percentageChange: ((parseFloat(item.price) - basePrice) / basePrice) * 100
                 }));
