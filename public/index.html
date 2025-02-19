@@ -1,0 +1,521 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>代币价格走势图</title>
+    <script src="https://cdn.jsdelivr.net/npm/echarts@5.4.3/dist/echarts.min.js"></script>
+    <style>
+        body {
+            margin: 0;
+            padding: 20px;
+            font-family: Arial, sans-serif;
+            background-color: #f5f5f5;
+        }
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            background-color: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        #chart {
+            width: 100%;
+            height: 700px;
+            margin-top: 20px;
+        }
+        .header {
+            text-align: center;
+            margin-bottom: 20px;
+            color: #333;
+        }
+        .controls {
+            display: flex;
+            justify-content: center;
+            gap: 10px;
+            margin: 20px 0;
+        }
+        .token-filter {
+            padding: 6px 12px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        .token-filter:hover {
+            background-color: #f0f0f0;
+        }
+        .token-filter.active {
+            background-color: #1890ff;
+            color: white;
+            border-color: #1890ff;
+        }
+        .charts-container {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+        #chart, #binance-chart {
+            width: 100%;
+            height: 600px;
+        }
+        .refresh-button {
+            position: fixed;
+            right: 20px;
+            bottom: 20px;
+            padding: 10px 20px;
+            background-color: #1890ff;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            transition: all 0.3s;
+        }
+        .refresh-button:hover {
+            background-color: #40a9ff;
+        }
+        .refresh-button:active {
+            background-color: #096dd9;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="charts-container">
+            <div>
+                <div class="header">
+                    <h1>OKX代币价格走势图</h1>
+                </div>
+                <div id="chart"></div>
+            </div>
+            <div>
+                <div class="header">
+                    <h1>币安代币价格走势图</h1>
+                </div>
+                <div id="binance-chart"></div>
+            </div>
+        </div>
+    </div>
+    <button class="refresh-button" onclick="refreshData()">刷新数据</button>
+
+    <script>
+        const chart = echarts.init(document.getElementById('chart'));
+        const binanceChart = echarts.init(document.getElementById('binance-chart'));
+        
+        // 为代币预设颜色
+        const tokenColors = {
+            'swarms': '#FF4136',
+            'arc': '#0074D9',
+            'pippin': '#2ECC40',
+            'LUMO': '#FFDC00',
+            'ACT': '#B10DC9',
+            'GOAT': '#FF851B',
+            'Fartcoin': '#7FDBFF',
+            'SNAI': '#01FF70',
+            'GRIFFAIN': '#F012BE',
+            'BUZZ': '#001F3F',
+            'listen': '#39CCCC',
+            'AVA': '#85144b',
+            'STONKS': '#3D9970'
+        };
+
+        // 添加 Binance 代币的颜色配置
+        const binanceTokenColors = {
+            'BTC': '#F7931A',
+            'ETH': '#627EEA',
+            'SOL': '#00FFA3',
+            'BNB': '#F3BA2F',
+            'SUI': '#4CA3FF',
+            'XRP': '#23292F',
+            'DOGE': '#C2A633',
+            'UNI': '#FF007A',
+            'ADA': '#0033AD',
+            'ATOM': '#2E3148',
+            'NEAR': '#000000',
+            'APT': '#1DE9B6',
+            'ENA': '#FF4136',
+            'AAVE': '#B6509E',
+            'LINK': '#2A5ADA',
+            'DYDX': '#6966FF',
+            'LTC': '#345D9D',
+            'ETC': '#328332',
+            'ENS': '#5298FF'
+        };
+
+        async function fetchData() {
+            try {
+                const response = await fetch('http://localhost:3040/api/prices');
+                const data = await response.json();
+                updateChart(data);
+            } catch (error) {
+                console.error('获取数据失败:', error);
+            }
+        }
+
+        function updateChart(data) {
+            const series = [];
+            const dates = new Set();
+            
+            // 计算每个代币的最新百分比变化
+            const latestChanges = {};
+            Object.entries(data).forEach(([tokenName, prices]) => {
+                if (prices.length > 0) {
+                    latestChanges[tokenName] = prices[prices.length - 1].percentageChange;
+                }
+            });
+
+            // 按照百分比变化排序的代币列表
+            const sortedTokens = Object.entries(latestChanges)
+                .sort((a, b) => b[1] - a[1]) // 降序排列
+                .map(([token]) => token);
+
+            // 按排序后的顺序创建系列
+            sortedTokens.forEach(tokenName => {
+                const prices = data[tokenName];
+                const tokenData = [];
+                prices.forEach(item => {
+                    const date = new Date(parseInt(item.time));
+                    dates.add(date.getTime());
+                    tokenData.push([
+                        date.getTime(),
+                        item.percentageChange
+                    ]);
+                });
+
+                series.push({
+                    name: tokenName,
+                    type: 'line',
+                    symbol: 'circle',
+                    symbolSize: 1,
+                    sampling: 'lttb',
+                    itemStyle: {
+                        color: tokenColors[tokenName]
+                    },
+                    lineStyle: {
+                        width: 1
+                    },
+                    emphasis: {
+                        focus: 'series',
+                        lineStyle: {
+                            width: 2
+                        }
+                    },
+                    data: tokenData.sort((a, b) => a[0] - b[0]),
+                });
+            });
+
+            const option = {
+                title: {
+                    text: '代币价格涨跌幅走势',
+                    subtext: '相对于初始价格的百分比变化',
+                    left: 'center',
+                    top: 0
+                },
+                tooltip: {
+                    trigger: 'axis',
+                    formatter: function(params) {
+                        const date = new Date(params[0].value[0]);
+                        let result = date.toLocaleDateString() + ' ' + 
+                                   date.toLocaleTimeString() + '<br/>';
+                        params.forEach(param => {
+                            const percentage = param.value[1];
+                            const color = tokenColors[param.seriesName];
+                            const sign = percentage >= 0 ? '+' : '';
+                            result += `<span style="display:inline-block;width:10px;height:10px;background-color:${color};margin-right:5px;"></span>` +
+                                     `<span style="color:${color};font-weight:bold">${param.seriesName}</span>: ${sign}${percentage.toFixed(2)}%<br/>`;
+                        });
+                        return result;
+                    },
+                    axisPointer: {
+                        type: 'cross',
+                        label: {
+                            backgroundColor: '#6a7985'
+                        }
+                    }
+                },
+                legend: {
+                    type: 'scroll',
+                    orient: 'vertical',
+                    right: 10,
+                    top: 50,
+                    bottom: 20,
+                    textStyle: {
+                        fontSize: 12
+                    },
+                    data: sortedTokens, // 使用排序后的代币列表
+                    selected: sortedTokens.reduce((acc, key) => {
+                        acc[key] = true;
+                        return acc;
+                    }, {})
+                },
+                grid: {
+                    left: '3%',
+                    right: '15%',
+                    bottom: '3%',
+                    containLabel: true
+                },
+                toolbox: {
+                    feature: {
+                        dataZoom: {
+                            yAxisIndex: 'none'
+                        },
+                        restore: {},
+                        saveAsImage: {}
+                    }
+                },
+                dataZoom: [
+                    {
+                        type: 'inside',
+                        start: 0,
+                        end: 100
+                    },
+                    {
+                        start: 0,
+                        end: 100
+                    }
+                ],
+                xAxis: {
+                    type: 'time',
+                    splitLine: {
+                        show: false
+                    }
+                },
+                yAxis: {
+                    type: 'value',
+                    axisLabel: {
+                        formatter: value => `${value.toFixed(2)}%`
+                    },
+                    splitLine: {
+                        show: true,
+                        lineStyle: {
+                            type: 'dashed'
+                        }
+                    },
+                    splitArea: {
+                        show: false
+                    },
+                    axisLine: {
+                        show: true
+                    },
+                    markLine: {
+                        silent: true,
+                        symbol: 'none',
+                        label: {
+                            show: false
+                        },
+                        data: [{
+                            yAxis: 0,
+                            lineStyle: {
+                                color: '#999',
+                                type: 'solid'
+                            }
+                        }]
+                    }
+                },
+                series: series
+            };
+
+            chart.setOption(option);
+        }
+
+        // 获取 Binance 数据的函数
+        async function fetchBinanceData() {
+            try {
+                const response = await fetch('http://localhost:3040/api/binance-prices');
+                const data = await response.json();
+                updateBinanceChart(data);
+            } catch (error) {
+                console.error('获取币安数据失败:', error);
+            }
+        }
+
+        // 更新 Binance 图表的函数
+        function updateBinanceChart(data) {
+            const series = [];
+            const dates = new Set();
+            
+            // 计算每个代币的最新百分比变化
+            const latestChanges = {};
+            Object.entries(data).forEach(([tokenName, prices]) => {
+                if (prices.length > 0) {
+                    latestChanges[tokenName] = prices[prices.length - 1].percentageChange;
+                }
+            });
+
+            // 按照百分比变化排序的代币列表
+            const sortedTokens = Object.entries(latestChanges)
+                .sort((a, b) => b[1] - a[1]) // 降序排列
+                .map(([token]) => token);
+
+            // 按排序后的顺序创建系列
+            sortedTokens.forEach(tokenName => {
+                const prices = data[tokenName];
+                const tokenData = [];
+                prices.forEach(item => {
+                    const date = new Date(parseInt(item.time));
+                    dates.add(date.getTime());
+                    tokenData.push([
+                        date.getTime(),
+                        item.percentageChange
+                    ]);
+                });
+
+                series.push({
+                    name: tokenName,
+                    type: 'line',
+                    symbol: 'circle',
+                    symbolSize: 1,
+                    sampling: 'lttb',
+                    itemStyle: {
+                        color: binanceTokenColors[tokenName] || tokenColors[tokenName]
+                    },
+                    lineStyle: {
+                        width: 1
+                    },
+                    emphasis: {
+                        focus: 'series',
+                        lineStyle: {
+                            width: 2
+                        }
+                    },
+                    data: tokenData.sort((a, b) => a[0] - b[0]),
+                });
+            });
+
+            const option = {
+                title: {
+                    text: '币安代币价格涨跌幅走势',
+                    subtext: '4小时K线 - 相对于初始价格的百分比变化',
+                    left: 'center',
+                    top: 0
+                },
+                tooltip: {
+                    trigger: 'axis',
+                    formatter: function(params) {
+                        const date = new Date(params[0].value[0]);
+                        let result = date.toLocaleDateString() + ' ' + 
+                                   date.toLocaleTimeString() + '<br/>';
+                        params.forEach(param => {
+                            const percentage = param.value[1];
+                            const color = binanceTokenColors[param.seriesName] || tokenColors[param.seriesName];
+                            const sign = percentage >= 0 ? '+' : '';
+                            result += `<span style="display:inline-block;width:10px;height:10px;background-color:${color};margin-right:5px;"></span>` +
+                                     `<span style="color:${color};font-weight:bold">${param.seriesName}</span>: ${sign}${percentage.toFixed(2)}%<br/>`;
+                        });
+                        return result;
+                    },
+                    axisPointer: {
+                        type: 'cross',
+                        label: {
+                            backgroundColor: '#6a7985'
+                        }
+                    }
+                },
+                legend: {
+                    type: 'scroll',
+                    orient: 'vertical',
+                    right: 10,
+                    top: 50,
+                    bottom: 20,
+                    textStyle: {
+                        fontSize: 12
+                    },
+                    data: sortedTokens, // 使用排序后的代币列表
+                    selected: sortedTokens.reduce((acc, key) => {
+                        acc[key] = true;
+                        return acc;
+                    }, {})
+                },
+                grid: {
+                    left: '3%',
+                    right: '15%',
+                    bottom: '3%',
+                    containLabel: true
+                },
+                toolbox: {
+                    feature: {
+                        dataZoom: {
+                            yAxisIndex: 'none'
+                        },
+                        restore: {},
+                        saveAsImage: {}
+                    }
+                },
+                dataZoom: [
+                    {
+                        type: 'inside',
+                        start: 0,
+                        end: 100
+                    },
+                    {
+                        start: 0,
+                        end: 100
+                    }
+                ],
+                xAxis: {
+                    type: 'time',
+                    splitLine: {
+                        show: false
+                    }
+                },
+                yAxis: {
+                    type: 'value',
+                    axisLabel: {
+                        formatter: value => `${value.toFixed(2)}%`
+                    },
+                    splitLine: {
+                        show: true,
+                        lineStyle: {
+                            type: 'dashed'
+                        }
+                    },
+                    splitArea: {
+                        show: false
+                    },
+                    axisLine: {
+                        show: true
+                    },
+                    markLine: {
+                        silent: true,
+                        symbol: 'none',
+                        label: {
+                            show: false
+                        },
+                        data: [{
+                            yAxis: 0,
+                            lineStyle: {
+                                color: '#999',
+                                type: 'solid'
+                            }
+                        }]
+                    }
+                },
+                series: series
+            };
+
+            binanceChart.setOption(option);
+        }
+
+        // 添加刷新函数
+        async function refreshData() {
+            await Promise.all([
+                fetchData(),
+                fetchBinanceData()
+            ]);
+            console.log('数据已刷新');
+        }
+
+        // 初始加载
+        fetchData();
+        fetchBinanceData();
+
+        // 响应窗口大小变化
+        window.addEventListener('resize', () => {
+            chart.resize();
+            binanceChart.resize();
+        });
+    </script>
+</body>
+</html> 
