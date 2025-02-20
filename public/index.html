@@ -86,13 +86,13 @@
         <div class="charts-container">
             <div>
                 <div class="header">
-                    <h1>OKX代币价格走势图</h1>
+                    <h1>链上MEME价格走势图</h1>
                 </div>
                 <div id="chart"></div>
             </div>
             <div>
                 <div class="header">
-                    <h1>币安代币价格走势图</h1>
+                    <h1>币安主流币价格走势图</h1>
                 </div>
                 <div id="binance-chart"></div>
             </div>
@@ -158,11 +158,13 @@
             const series = [];
             const dates = new Set();
             
-            // 计算每个代币的最新百分比变化
+            // 计算每个代币的最新百分比变化和价格
             const latestChanges = {};
+            const latestPrices = {};
             Object.entries(data).forEach(([tokenName, prices]) => {
                 if (prices.length > 0) {
                     latestChanges[tokenName] = prices[prices.length - 1].percentageChange;
+                    latestPrices[tokenName] = prices[prices.length - 1].price;
                 }
             });
 
@@ -208,8 +210,7 @@
 
             const option = {
                 title: {
-                    text: '代币价格涨跌幅走势',
-                    subtext: '相对于初始价格的百分比变化',
+                    text: '1小时144根k线(6天)',
                     left: 'center',
                     top: 0
                 },
@@ -244,7 +245,12 @@
                     textStyle: {
                         fontSize: 12
                     },
-                    data: sortedTokens, // 使用排序后的代币列表
+                    formatter: function(name) {
+                        const price = latestPrices[name] ? 
+                            `  $${parseFloat(latestPrices[name]).toFixed(4)}` : '';
+                        return name + price;
+                    },
+                    data: sortedTokens,
                     selected: sortedTokens.reduce((acc, key) => {
                         acc[key] = true;
                         return acc;
@@ -336,11 +342,13 @@
             const series = [];
             const dates = new Set();
             
-            // 计算每个代币的最新百分比变化
+            // 计算每个代币的最新百分比变化和价格
             const latestChanges = {};
+            const latestPrices = {};
             Object.entries(data).forEach(([tokenName, prices]) => {
                 if (prices.length > 0) {
                     latestChanges[tokenName] = prices[prices.length - 1].percentageChange;
+                    latestPrices[tokenName] = prices[prices.length - 1].price;
                 }
             });
 
@@ -386,8 +394,7 @@
 
             const option = {
                 title: {
-                    text: '币安代币价格涨跌幅走势',
-                    subtext: '4小时K线 - 相对于初始价格的百分比变化',
+                    text: '4h走势图120根K线(20天)',
                     left: 'center',
                     top: 0
                 },
@@ -422,7 +429,12 @@
                     textStyle: {
                         fontSize: 12
                     },
-                    data: sortedTokens, // 使用排序后的代币列表
+                    formatter: function(name) {
+                        const price = latestPrices[name] ? 
+                            `  $${parseFloat(latestPrices[name]).toFixed(2)}` : '';
+                        return name + price;
+                    },
+                    data: sortedTokens,
                     selected: sortedTokens.reduce((acc, key) => {
                         acc[key] = true;
                         return acc;
