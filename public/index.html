@@ -20,45 +20,28 @@
             border-radius: 8px;
             box-shadow: 0 2px 4px rgba(0,0,0,0.1);
         }
-        #chart {
-            width: 100%;
-            height: 700px;
-            margin-top: 20px;
-        }
         .header {
             text-align: center;
             margin-bottom: 20px;
             color: #333;
         }
-        .controls {
-            display: flex;
-            justify-content: center;
-            gap: 10px;
-            margin: 20px 0;
+        .charts-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+            gap: 15px;
+            margin-top: 20px;
         }
-        .token-filter {
-            padding: 6px 12px;
-            border: 1px solid #ddd;
-            border-radius: 4px;
-            cursor: pointer;
-            transition: all 0.3s;
+        .chart-item {
+            height: 200px;
+            border: 1px solid #eee;
+            border-radius: 5px;
+            overflow: hidden;
         }
-        .token-filter:hover {
-            background-color: #f0f0f0;
-        }
-        .token-filter.active {
-            background-color: #1890ff;
-            color: white;
-            border-color: #1890ff;
-        }
-        .charts-container {
-            display: flex;
-            flex-direction: column;
-            gap: 20px;
-        }
-        #chart, #binance-chart {
-            width: 100%;
-            height: 600px;
+        .section-title {
+            margin: 30px 0 15px;
+            padding-bottom: 10px;
+            border-bottom: 1px solid #eee;
+            color: #333;
         }
         .refresh-button {
             position: fixed;
@@ -83,20 +66,15 @@
 </head>
 <body>
     <div class="container">
-        <div class="charts-container">
-            <div>
-                <div class="header">
-                    <h1>链上MEME价格走势图</h1>
-                </div>
-                <div id="chart"></div>
-            </div>
-            <div>
-                <div class="header">
-                    <h1>币安主流币价格走势图</h1>
-                </div>
-                <div id="binance-chart"></div>
-            </div>
+        <div class="header">
+            <h1>代币价格走势图</h1>
         </div>
+        
+        <h2 class="section-title">链上MEME代币</h2>
+        <div id="meme-charts-grid" class="charts-grid"></div>
+        
+        <h2 class="section-title">币安主流币</h2>
+        <div id="binance-charts-grid" class="charts-grid"></div>
     </div>
     <button class="refresh-button" onclick="refreshData()">刷新数据</button>
 
@@ -144,370 +122,179 @@
             'ENS': '#5298FF'
         };
 
+        // 创建单个图表的函数
+        function createChart(containerId, tokenName, data, color) {
+            const container = document.createElement('div');
+            container.className = 'chart-item';
+            container.id = `chart-${tokenName}`;
+            document.getElementById(containerId).appendChild(container);
+            
+            const chart = echarts.init(container);
+            
+            const chartData = data.map(item => [
+                new Date(parseInt(item.time)).getTime(),
+                item.percentageChange
+            ]).sort((a, b) => a[0] - b[0]);
+            
+            // 计算最后一个数据点的百分比变化
+            const lastPercentage = chartData.length > 0 ? chartData[chartData.length - 1][1] : 0;
+            
+            const option = {
+                title: {
+                    text: tokenName,
+                    left: 'center',
+                    top: 0,
+                    textStyle: {
+                        fontSize: 14,
+                        fontWeight: 'bold'
+                    }
+                },
+                grid: {
+                    left: '10%',
+                    right: '5%',
+                    top: '25%',
+                    bottom: '15%'
+                },
+                tooltip: {
+                    trigger: 'axis',
+                    formatter: function(params) {
+                        const date = new Date(params[0].value[0]);
+                        const percentage = params[0].value[1];
+                        const sign = percentage >= 0 ? '+' : '';
+                        return date.toLocaleDateString() + ' ' + 
+                               date.toLocaleTimeString() + '<br/>' +
+                               `${sign}${percentage.toFixed(2)}%`;
+                    }
+                },
+                xAxis: {
+                    type: 'time',
+                    axisLabel: {
+                        formatter: '{MM}-{dd}',
+                        fontSize: 10
+                    }
+                },
+                yAxis: {
+                    type: 'value',
+                    axisLabel: {
+                        formatter: '{value}%',
+                        fontSize: 10
+                    },
+                    splitLine: {
+                        show: true,
+                        lineStyle: {
+                            type: 'dashed'
+                        }
+                    }
+                },
+                series: [{
+                    data: chartData,
+                    type: 'line',
+                    smooth: false,
+                    symbol: 'none',
+                    lineStyle: {
+                        color: color,
+                        width: 2
+                    },
+                    areaStyle: {
+                        color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
+                            {
+                                offset: 0,
+                                color: color.replace(')', ', 0.3)')
+                            },
+                            {
+                                offset: 1,
+                                color: color.replace(')', ', 0.05)')
+                            }
+                        ])
+                    }
+                }]
+            };
+            
+            // 在右上角添加百分比变化标签
+            if (chartData.length > 0) {
+                option.graphic = [{
+                    type: 'text',
+                    right: 10,
+                    top: 10,
+                    style: {
+                        text: lastPercentage >= 0 ? `+${lastPercentage.toFixed(1)}%` : `${lastPercentage.toFixed(1)}%`,
+                        fontSize: 14,
+                        fontWeight: 'bold',
+                        fill: lastPercentage >= 0 ? '#2ecc40' : '#ff4136'
+                    }
+                }];
+            }
+            
+            chart.setOption(option);
+            return chart;
+        }
+
+        // 存储所有图表的引用
+        const chartInstances = {
+            meme: {},
+            binance: {}
+        };
+
         async function fetchData() {
             try {
                 const response = await fetch('/api/prices');
                 const data = await response.json();
-                updateChart(data);
+                
+                // 清空现有图表容器
+                document.getElementById('meme-charts-grid').innerHTML = '';
+                
+                // 计算每个代币的最新百分比变化
+                const latestChanges = {};
+                Object.entries(data).forEach(([tokenName, prices]) => {
+                    if (prices.length > 0) {
+                        latestChanges[tokenName] = prices[prices.length - 1].percentageChange;
+                    }
+                });
+                
+                // 按照百分比变化排序的代币列表
+                const sortedTokens = Object.entries(latestChanges)
+                    .sort((a, b) => b[1] - a[1]) // 降序排列
+                    .map(([token]) => token);
+                
+                // 为每个代币创建图表
+                sortedTokens.forEach(tokenName => {
+                    const color = tokenColors[tokenName] || `rgb(${Math.floor(Math.random() * 255)}, ${Math.floor(Math.random() * 255)}, ${Math.floor(Math.random() * 255)})`;
+                    chartInstances.meme[tokenName] = createChart('meme-charts-grid', tokenName, data[tokenName], color);
+                });
             } catch (error) {
                 console.error('获取数据失败:', error);
             }
         }
 
-        function updateChart(data) {
-            const series = [];
-            const dates = new Set();
-            
-            // 计算每个代币的最新百分比变化和价格
-            const latestChanges = {};
-            const latestPrices = {};
-            Object.entries(data).forEach(([tokenName, prices]) => {
-                if (prices.length > 0) {
-                    latestChanges[tokenName] = prices[prices.length - 1].percentageChange;
-                    latestPrices[tokenName] = prices[prices.length - 1].price;
-                }
-            });
-
-            // 按照百分比变化排序的代币列表
-            const sortedTokens = Object.entries(latestChanges)
-                .sort((a, b) => b[1] - a[1]) // 降序排列
-                .map(([token]) => token);
-
-            // 按排序后的顺序创建系列
-            sortedTokens.forEach(tokenName => {
-                const prices = data[tokenName];
-                const tokenData = [];
-                prices.forEach(item => {
-                    const date = new Date(parseInt(item.time));
-                    dates.add(date.getTime());
-                    tokenData.push([
-                        date.getTime(),
-                        item.percentageChange
-                    ]);
-                });
-
-                series.push({
-                    name: tokenName,
-                    type: 'line',
-                    symbol: 'circle',
-                    symbolSize: 1,
-                    sampling: 'lttb',
-                    itemStyle: {
-                        color: tokenColors[tokenName]
-                    },
-                    lineStyle: {
-                        width: 1
-                    },
-                    emphasis: {
-                        focus: 'series',
-                        lineStyle: {
-                            width: 2
-                        }
-                    },
-                    data: tokenData.sort((a, b) => a[0] - b[0]),
-                });
-            });
-
-            const option = {
-                title: {
-                    text: '1小时144根k线(6天)',
-                    left: 'center',
-                    top: 0
-                },
-                tooltip: {
-                    trigger: 'axis',
-                    formatter: function(params) {
-                        const date = new Date(params[0].value[0]);
-                        let result = date.toLocaleDateString() + ' ' + 
-                                   date.toLocaleTimeString() + '<br/>';
-                        params.forEach(param => {
-                            const percentage = param.value[1];
-                            const color = tokenColors[param.seriesName];
-                            const sign = percentage >= 0 ? '+' : '';
-                            result += `<span style="display:inline-block;width:10px;height:10px;background-color:${color};margin-right:5px;"></span>` +
-                                     `<span style="color:${color};font-weight:bold">${param.seriesName}</span>: ${sign}${percentage.toFixed(2)}%<br/>`;
-                        });
-                        return result;
-                    },
-                    axisPointer: {
-                        type: 'cross',
-                        label: {
-                            backgroundColor: '#6a7985'
-                        }
-                    }
-                },
-                legend: {
-                    type: 'scroll',
-                    orient: 'vertical',
-                    right: 10,
-                    top: 50,
-                    bottom: 20,
-                    textStyle: {
-                        fontSize: 12
-                    },
-                    formatter: function(name) {
-                        const price = latestPrices[name] ? 
-                            `  $${parseFloat(latestPrices[name]).toFixed(4)}` : '';
-                        return name + price;
-                    },
-                    data: sortedTokens,
-                    selected: sortedTokens.reduce((acc, key) => {
-                        acc[key] = true;
-                        return acc;
-                    }, {})
-                },
-                grid: {
-                    left: '3%',
-                    right: '15%',
-                    bottom: '3%',
-                    containLabel: true
-                },
-                toolbox: {
-                    feature: {
-                        dataZoom: {
-                            yAxisIndex: 'none'
-                        },
-                        restore: {},
-                        saveAsImage: {}
-                    }
-                },
-                dataZoom: [
-                    {
-                        type: 'inside',
-                        start: 0,
-                        end: 100
-                    },
-                    {
-                        start: 0,
-                        end: 100
-                    }
-                ],
-                xAxis: {
-                    type: 'time',
-                    splitLine: {
-                        show: false
-                    }
-                },
-                yAxis: {
-                    type: 'value',
-                    axisLabel: {
-                        formatter: value => `${value.toFixed(2)}%`
-                    },
-                    splitLine: {
-                        show: true,
-                        lineStyle: {
-                            type: 'dashed'
-                        }
-                    },
-                    splitArea: {
-                        show: false
-                    },
-                    axisLine: {
-                        show: true
-                    },
-                    markLine: {
-                        silent: true,
-                        symbol: 'none',
-                        label: {
-                            show: false
-                        },
-                        data: [{
-                            yAxis: 0,
-                            lineStyle: {
-                                color: '#999',
-                                type: 'solid'
-                            }
-                        }]
-                    }
-                },
-                series: series
-            };
-
-            chart.setOption(option);
-        }
-
-        // 获取 Binance 数据的函数
         async function fetchBinanceData() {
             try {
                 const response = await fetch('/api/binance-prices');
                 const data = await response.json();
-                updateBinanceChart(data);
+                
+                // 清空现有图表容器
+                document.getElementById('binance-charts-grid').innerHTML = '';
+                
+                // 计算每个代币的最新百分比变化
+                const latestChanges = {};
+                Object.entries(data).forEach(([tokenName, prices]) => {
+                    if (prices.length > 0) {
+                        latestChanges[tokenName] = prices[prices.length - 1].percentageChange;
+                    }
+                });
+                
+                // 按照百分比变化排序的代币列表
+                const sortedTokens = Object.entries(latestChanges)
+                    .sort((a, b) => b[1] - a[1]) // 降序排列
+                    .map(([token]) => token);
+                
+                // 为每个代币创建图表
+                sortedTokens.forEach(tokenName => {
+                    const color = binanceTokenColors[tokenName] || `rgb(${Math.floor(Math.random() * 255)}, ${Math.floor(Math.random() * 255)}, ${Math.floor(Math.random() * 255)})`;
+                    chartInstances.binance[tokenName] = createChart('binance-charts-grid', tokenName, data[tokenName], color);
+                });
             } catch (error) {
                 console.error('获取币安数据失败:', error);
             }
-        }
-
-        // 更新 Binance 图表的函数
-        function updateBinanceChart(data) {
-            const series = [];
-            const dates = new Set();
-            
-            // 计算每个代币的最新百分比变化和价格
-            const latestChanges = {};
-            const latestPrices = {};
-            Object.entries(data).forEach(([tokenName, prices]) => {
-                if (prices.length > 0) {
-                    latestChanges[tokenName] = prices[prices.length - 1].percentageChange;
-                    latestPrices[tokenName] = prices[prices.length - 1].price;
-                }
-            });
-
-            // 按照百分比变化排序的代币列表
-            const sortedTokens = Object.entries(latestChanges)
-                .sort((a, b) => b[1] - a[1]) // 降序排列
-                .map(([token]) => token);
-
-            // 按排序后的顺序创建系列
-            sortedTokens.forEach(tokenName => {
-                const prices = data[tokenName];
-                const tokenData = [];
-                prices.forEach(item => {
-                    const date = new Date(parseInt(item.time));
-                    dates.add(date.getTime());
-                    tokenData.push([
-                        date.getTime(),
-                        item.percentageChange
-                    ]);
-                });
-
-                series.push({
-                    name: tokenName,
-                    type: 'line',
-                    symbol: 'circle',
-                    symbolSize: 1,
-                    sampling: 'lttb',
-                    itemStyle: {
-                        color: binanceTokenColors[tokenName] || tokenColors[tokenName]
-                    },
-                    lineStyle: {
-                        width: 1
-                    },
-                    emphasis: {
-                        focus: 'series',
-                        lineStyle: {
-                            width: 2
-                        }
-                    },
-                    data: tokenData.sort((a, b) => a[0] - b[0]),
-                });
-            });
-
-            const option = {
-                title: {
-                    text: '4h走势图120根K线(20天)',
-                    left: 'center',
-                    top: 0
-                },
-                tooltip: {
-                    trigger: 'axis',
-                    formatter: function(params) {
-                        const date = new Date(params[0].value[0]);
-                        let result = date.toLocaleDateString() + ' ' + 
-                                   date.toLocaleTimeString() + '<br/>';
-                        params.forEach(param => {
-                            const percentage = param.value[1];
-                            const color = binanceTokenColors[param.seriesName] || tokenColors[param.seriesName];
-                            const sign = percentage >= 0 ? '+' : '';
-                            result += `<span style="display:inline-block;width:10px;height:10px;background-color:${color};margin-right:5px;"></span>` +
-                                     `<span style="color:${color};font-weight:bold">${param.seriesName}</span>: ${sign}${percentage.toFixed(2)}%<br/>`;
-                        });
-                        return result;
-                    },
-                    axisPointer: {
-                        type: 'cross',
-                        label: {
-                            backgroundColor: '#6a7985'
-                        }
-                    }
-                },
-                legend: {
-                    type: 'scroll',
-                    orient: 'vertical',
-                    right: 10,
-                    top: 50,
-                    bottom: 20,
-                    textStyle: {
-                        fontSize: 12
-                    },
-                    formatter: function(name) {
-                        const price = latestPrices[name] ? 
-                            `  $${parseFloat(latestPrices[name]).toFixed(2)}` : '';
-                        return name + price;
-                    },
-                    data: sortedTokens,
-                    selected: sortedTokens.reduce((acc, key) => {
-                        acc[key] = true;
-                        return acc;
-                    }, {})
-                },
-                grid: {
-                    left: '3%',
-                    right: '15%',
-                    bottom: '3%',
-                    containLabel: true
-                },
-                toolbox: {
-                    feature: {
-                        dataZoom: {
-                            yAxisIndex: 'none'
-                        },
-                        restore: {},
-                        saveAsImage: {}
-                    }
-                },
-                dataZoom: [
-                    {
-                        type: 'inside',
-                        start: 0,
-                        end: 100
-                    },
-                    {
-                        start: 0,
-                        end: 100
-                    }
-                ],
-                xAxis: {
-                    type: 'time',
-                    splitLine: {
-                        show: false
-                    }
-                },
-                yAxis: {
-                    type: 'value',
-                    axisLabel: {
-                        formatter: value => `${value.toFixed(2)}%`
-                    },
-                    splitLine: {
-                        show: true,
-                        lineStyle: {
-                            type: 'dashed'
-                        }
-                    },
-                    splitArea: {
-                        show: false
-                    },
-                    axisLine: {
-                        show: true
-                    },
-                    markLine: {
-                        silent: true,
-                        symbol: 'none',
-                        label: {
-                            show: false
-                        },
-                        data: [{
-                            yAxis: 0,
-                            lineStyle: {
-                                color: '#999',
-                                type: 'solid'
-                            }
-                        }]
-                    }
-                },
-                series: series
-            };
-
-            binanceChart.setOption(option);
         }
 
         // 添加刷新函数
@@ -525,8 +312,9 @@
 
         // 响应窗口大小变化
         window.addEventListener('resize', () => {
-            chart.resize();
-            binanceChart.resize();
+            // 重新调整所有图表大小
+            Object.values(chartInstances.meme).forEach(chart => chart.resize());
+            Object.values(chartInstances.binance).forEach(chart => chart.resize());
         });
     </script>
 </body>
