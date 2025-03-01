@@ -128,13 +128,16 @@
             
             const chart = echarts.init(container);
             
+            // 使用实际价格而非百分比变化
             const chartData = data.map(item => [
                 new Date(parseInt(item.time)).getTime(),
-                item.percentageChange
+                parseFloat(item.price)
             ]).sort((a, b) => a[0] - b[0]);
             
-            // 计算最后一个数据点的百分比变化
-            const lastPercentage = chartData.length > 0 ? chartData[chartData.length - 1][1] : 0;
+            // 计算最后一个数据点的百分比变化（仍然保留用于右上角显示）
+            const lastPercentage = data.length > 0 ? data[data.length - 1].percentageChange : 0;
+            // 获取最新价格用于显示
+            const lastPrice = chartData.length > 0 ? chartData[chartData.length - 1][1] : 0;
             
             const option = {
                 title: {
@@ -156,11 +159,10 @@
                     trigger: 'axis',
                     formatter: function(params) {
                         const date = new Date(params[0].value[0]);
-                        const percentage = params[0].value[1];
-                        const sign = percentage >= 0 ? '+' : '';
+                        const price = params[0].value[1];
                         return date.toLocaleDateString() + ' ' + 
                                date.toLocaleTimeString() + '<br/>' +
-                               `${sign}${percentage.toFixed(2)}%`;
+                               `$${price.toFixed(4)}`;
                     }
                 },
                 xAxis: {
@@ -173,7 +175,7 @@
                 yAxis: {
                     type: 'value',
                     axisLabel: {
-                        formatter: '{value}%',
+                        formatter: '${value}',
                         fontSize: 10
                     },
                     splitLine: {
@@ -207,19 +209,33 @@
                 }]
             };
             
-            // 在右上角添加百分比变化标签
+            // 在右上角添加百分比变化标签和价格
             if (chartData.length > 0) {
-                option.graphic = [{
-                    type: 'text',
-                    right: 10,
-                    top: 10,
-                    style: {
-                        text: lastPercentage >= 0 ? `+${lastPercentage.toFixed(1)}%` : `${lastPercentage.toFixed(1)}%`,
-                        fontSize: 14,
-                        fontWeight: 'bold',
-                        fill: lastPercentage >= 0 ? '#2ecc40' : '#ff4136'
+                option.graphic = [
+                    // 百分比变化
+                    {
+                        type: 'text',
+                        right: 10,
+                        top: 10,
+                        style: {
+                            text: lastPercentage >= 0 ? `+${lastPercentage.toFixed(1)}%` : `${lastPercentage.toFixed(1)}%`,
+                            fontSize: 14,
+                            fontWeight: 'bold',
+                            fill: lastPercentage >= 0 ? '#2ecc40' : '#ff4136'
+                        }
+                    },
+                    // 当前价格
+                    {
+                        type: 'text',
+                        right: 10,
+                        top: 30,
+                        style: {
+                            text: `$${lastPrice.toFixed(4)}`,
+                            fontSize: 12,
+                            fill: '#666'
+                        }
                     }
-                }];
+                ];
             }
             
             chart.setOption(option);
