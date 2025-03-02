@@ -27,7 +27,7 @@ const binanceTokens = [
     'XRP', 'DOGE', 'UNI', 'ADA', 'ATOM',
     'NEAR', 'APT', 'ENA', 'AAVE', 'LINK',
     'DYDX', 'LTC', 'ETC', 'ENS', 'ARB',
-    'ENA', 'AVAX', 'THETA', 'JUP'
+    'MKR', 'AVAX', 'THETA', 'JUP'
 ];
 
 // 代币地址枚举
