@@ -80,11 +80,19 @@ async function getTokenPrice(tokenName, tokenAddress) {
         if (response.data && response.data.data && response.data.data[0] && response.data.data[0].prices) {
             const prices = response.data.data[0].prices;
             if (prices.length > 0) {
-                const basePrice = parseFloat(prices[0].price);
+                const firstPrice = parseFloat(prices[prices.length - 1].price);
+                const lastPrice = parseFloat(prices[0].price);
+                const percentageChange = ((lastPrice - firstPrice) / firstPrice) * 100;
+                
                 const pricesWithPercentage = prices.map(item => ({
                     ...item,
-                    percentageChange: ((parseFloat(item.price) - basePrice) / basePrice) * 100
+                    percentageChange: ((parseFloat(item.price) - firstPrice) / firstPrice) * 100
                 }));
+                
+                if (pricesWithPercentage.length > 0) {
+                    pricesWithPercentage[0].percentageChange = percentageChange;
+                }
+                
                 okxTokenPricesData[tokenName] = pricesWithPercentage;
             } else {
                 okxTokenPricesData[tokenName] = prices;
@@ -115,12 +123,19 @@ async function getBinanceTokenKlines(token) {
         });
 
         if (response.data && Array.isArray(response.data)) {
-            const basePrice = parseFloat(response.data[0][4]);
+            const firstPrice = parseFloat(response.data[0][4]);
+            const lastPrice = parseFloat(response.data[response.data.length - 1][4]);
+            const percentageChange = ((lastPrice - firstPrice) / firstPrice) * 100;
+            
             const processedData = response.data.map(kline => ({
                 time: kline[0].toString(),
                 price: kline[4],
-                percentageChange: ((parseFloat(kline[4]) - basePrice) / basePrice) * 100
+                percentageChange: ((parseFloat(kline[4]) - firstPrice) / firstPrice) * 100
             }));
+            
+            if (processedData.length > 0) {
+                processedData[processedData.length - 1].percentageChange = percentageChange;
+            }
             
             binanceTokenPricesData[token] = processedData;
             console.log(`获取 Binance ${token} 数据成功`);

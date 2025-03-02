@@ -134,8 +134,14 @@
                 parseFloat(item.price)
             ]).sort((a, b) => a[0] - b[0]);
             
-            // 计算最后一个数据点的百分比变化（仍然保留用于右上角显示）
-            const lastPercentage = data.length > 0 ? data[data.length - 1].percentageChange : 0;
+            // 修正百分比计算：使用最后一个价格与第一个价格比较
+            let lastPercentage = 0;
+            if (chartData.length > 0) {
+                const firstPrice = chartData[0][1]; // 最早的价格
+                const lastPrice = chartData[chartData.length - 1][1]; // 最新的价格
+                lastPercentage = ((lastPrice - firstPrice) / firstPrice) * 100;
+            }
+            
             // 获取最新价格用于显示
             const lastPrice = chartData.length > 0 ? chartData[chartData.length - 1][1] : 0;
             
@@ -165,7 +171,7 @@
                     }
                 },
                 grid: {
-                    left: '15%',
+                    left: '25%',
                     right: '5%',
                     top: '25%',
                     bottom: '15%'
