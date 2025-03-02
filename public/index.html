@@ -13,7 +13,7 @@
             background-color: #f5f5f5;
         }
         .container {
-            max-width: 1400px;
+            max-width: 1800px; /* 增加宽度以适应更多列 */
             margin: 0 auto;
             background-color: white;
             padding: 20px;
@@ -27,7 +27,7 @@
         }
         .charts-grid {
             display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+            grid-template-columns: repeat(8, 1fr); /* 每行8个币种 */
             gap: 15px;
             margin-top: 20px;
         }
@@ -139,6 +139,21 @@
             // 获取最新价格用于显示
             const lastPrice = chartData.length > 0 ? chartData[chartData.length - 1][1] : 0;
             
+            // 计算价格范围，用于Y轴设置
+            let minPrice = Infinity;
+            let maxPrice = -Infinity;
+            
+            chartData.forEach(item => {
+                const price = item[1];
+                if (price < minPrice) minPrice = price;
+                if (price > maxPrice) maxPrice = price;
+            });
+            
+            // 添加一点缓冲区，使图表不会紧贴边界
+            const buffer = (maxPrice - minPrice) * 0.1;
+            minPrice = Math.max(0, minPrice - buffer); // 确保不会低于0
+            maxPrice = maxPrice + buffer;
+            
             const option = {
                 title: {
                     text: tokenName,
@@ -168,12 +183,22 @@
                 xAxis: {
                     type: 'time',
                     axisLabel: {
-                        formatter: '{MM}-{dd}',
-                        fontSize: 10
+                        show: false // 隐藏所有X轴标签
+                    },
+                    axisTick: {
+                        show: false // 隐藏刻度线
+                    },
+                    axisLine: {
+                        show: true // 保留轴线
+                    },
+                    splitLine: {
+                        show: false // 隐藏分割线
                     }
                 },
                 yAxis: {
                     type: 'value',
+                    min: minPrice,
+                    max: maxPrice,
                     axisLabel: {
                         formatter: '${value}',
                         fontSize: 10
