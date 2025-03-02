@@ -165,7 +165,7 @@
                     }
                 },
                 grid: {
-                    left: '10%',
+                    left: '15%',
                     right: '5%',
                     top: '25%',
                     bottom: '15%'
@@ -183,7 +183,15 @@
                 xAxis: {
                     type: 'time',
                     axisLabel: {
-                        show: false // 隐藏所有X轴标签
+                        show: true,
+                        formatter: function(value) {
+                            const date = new Date(value);
+                            return date.getMonth() + 1 + '/' + date.getDate();
+                        },
+                        fontSize: 10,
+                        showMinLabel: true,
+                        showMaxLabel: true,
+                        hideOverlap: true
                     },
                     axisTick: {
                         show: false // 隐藏刻度线
@@ -193,6 +201,10 @@
                     },
                     splitLine: {
                         show: false // 隐藏分割线
+                    },
+                    // 只显示头尾两个标签
+                    interval: function(index, value) {
+                        return index === 0 || index === data.length - 1;
                     }
                 },
                 yAxis: {
@@ -200,15 +212,31 @@
                     min: minPrice,
                     max: maxPrice,
                     axisLabel: {
-                        formatter: '${value}',
-                        fontSize: 10
+                        formatter: function(value) {
+                            // 根据价格大小调整显示格式
+                            if (value < 0.001) {
+                                return '$' + value.toExponential(2);
+                            } else if (value < 1) {
+                                return '$' + value.toFixed(4);
+                            } else if (value < 10) {
+                                return '$' + value.toFixed(2);
+                            } else if (value < 1000) {
+                                return '$' + value.toFixed(1);
+                            } else {
+                                return '$' + Math.round(value);
+                            }
+                        },
+                        fontSize: 10,
+                        margin: 2 // 减小标签与轴的距离
                     },
                     splitLine: {
                         show: true,
                         lineStyle: {
                             type: 'dashed'
                         }
-                    }
+                    },
+                    // 减少Y轴刻度数量，避免拥挤
+                    splitNumber: 3
                 },
                 series: [{
                     data: chartData,
