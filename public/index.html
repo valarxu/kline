@@ -315,16 +315,21 @@
                 // 清空现有图表容器
                 document.getElementById('meme-charts-grid').innerHTML = '';
                 
-                // 计算每个代币的最新百分比变化
-                const latestChanges = {};
+                // 计算每个代币的实际涨跌幅（使用第一个和最后一个价格点）
+                const tokenChanges = {};
                 Object.entries(data).forEach(([tokenName, prices]) => {
                     if (prices.length > 0) {
-                        latestChanges[tokenName] = prices[prices.length - 1].percentageChange;
+                        // 确保价格数据按时间排序
+                        const sortedPrices = [...prices].sort((a, b) => parseInt(a.time) - parseInt(b.time));
+                        const firstPrice = parseFloat(sortedPrices[0].price);
+                        const lastPrice = parseFloat(sortedPrices[sortedPrices.length - 1].price);
+                        const percentageChange = ((lastPrice - firstPrice) / firstPrice) * 100;
+                        tokenChanges[tokenName] = percentageChange;
                     }
                 });
                 
-                // 按照百分比变化排序的代币列表
-                const sortedTokens = Object.entries(latestChanges)
+                // 按照涨跌幅排序的代币列表（从高到低）
+                const sortedTokens = Object.entries(tokenChanges)
                     .sort((a, b) => b[1] - a[1]) // 降序排列
                     .map(([token]) => token);
                 
@@ -346,16 +351,21 @@
                 // 清空现有图表容器
                 document.getElementById('binance-charts-grid').innerHTML = '';
                 
-                // 计算每个代币的最新百分比变化
-                const latestChanges = {};
+                // 计算每个代币的实际涨跌幅（使用第一个和最后一个价格点）
+                const tokenChanges = {};
                 Object.entries(data).forEach(([tokenName, prices]) => {
                     if (prices.length > 0) {
-                        latestChanges[tokenName] = prices[prices.length - 1].percentageChange;
+                        // 确保价格数据按时间排序
+                        const sortedPrices = [...prices].sort((a, b) => parseInt(a.time) - parseInt(b.time));
+                        const firstPrice = parseFloat(sortedPrices[0].price);
+                        const lastPrice = parseFloat(sortedPrices[sortedPrices.length - 1].price);
+                        const percentageChange = ((lastPrice - firstPrice) / firstPrice) * 100;
+                        tokenChanges[tokenName] = percentageChange;
                     }
                 });
                 
-                // 按照百分比变化排序的代币列表
-                const sortedTokens = Object.entries(latestChanges)
+                // 按照涨跌幅排序的代币列表（从高到低）
+                const sortedTokens = Object.entries(tokenChanges)
                     .sort((a, b) => b[1] - a[1]) // 降序排列
                     .map(([token]) => token);
                 

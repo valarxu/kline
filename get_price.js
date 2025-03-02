@@ -26,7 +26,8 @@ const binanceTokens = [
     'BTC', 'ETH', 'SOL', 'BNB', 'SUI', 
     'XRP', 'DOGE', 'UNI', 'ADA', 'ATOM',
     'NEAR', 'APT', 'ENA', 'AAVE', 'LINK',
-    'DYDX', 'LTC', 'ETC', 'ENS'
+    'DYDX', 'LTC', 'ETC', 'ENS', 'ARB',
+    'ENA', 'AVAX', 'THETA', 'JUP'
 ];
 
 // 代币地址枚举
@@ -43,7 +44,10 @@ const tokenAddresses = {
     'BUZZ': '9DHe3pycTuymFk4H4bbPoAJ4hQrr2kaLDF6J6aAKpump',
     'listen': 'Cn5Ne1vmR9ctMGY9z5NC71A3NYFvopjXNyxYtfVYpump',
     'AVA': 'DKu9kykSfbN5LBfFXtNNDPaX35o4Fv6vJ9FKk7pZpump',
-    'STONKS': '6NcdiK8B5KK2DzKvzvCfqi8EHaEqu48fyEzC8Mm9pump'
+    'STONKS': '6NcdiK8B5KK2DzKvzvCfqi8EHaEqu48fyEzC8Mm9pump',
+    'pnut': 'HeLp6NuQkmYB4pYWo2zYs22mESHXPQYzXbB8n4V98jwC',
+    'ai16z': 'HeLp6NuQkmYB4pYWo2zYs22mESHXPQYzXbB8n4V98jwC',
+    'Trump': '6p6xgHyF7AeE6TZkSmFsko444wqoP15icUSqi2jfGiPN'
 };
 
 // 生成签名
