@@ -3,6 +3,7 @@ const crypto = require('crypto');
 const express = require('express');
 const cors = require('cors');
 const cron = require('node-cron');
+const multer = require('multer');
 require('dotenv').config();
 
 const app = express();
@@ -49,6 +50,14 @@ const tokenAddresses = {
     'ai16z': 'HeLp6NuQkmYB4pYWo2zYs22mESHXPQYzXbB8n4V98jwC',
     'Trump': '6p6xgHyF7AeE6TZkSmFsko444wqoP15icUSqi2jfGiPN'
 };
+
+// 添加用于处理文件上传的中间件
+const storage = multer.memoryStorage();
+const upload = multer({ storage: storage });
+
+// 添加 Telegram Bot API 配置
+const telegramBotToken = process.env.TELEGRAM_BOT_TOKEN;
+const telegramChatId = process.env.TELEGRAM_CHAT_ID;
 
 // 生成签名
 function sign(timestamp, method, requestPath, body = '') {
@@ -188,6 +197,51 @@ app.get('/api/prices', (req, res) => {
 
 app.get('/api/binance-prices', (req, res) => {
     res.json(binanceTokenPricesData);
+});
+
+// 添加 Telegram 发送图片API
+app.post('/api/send-to-telegram', upload.single('image'), async (req, res) => {
+    try {
+        if (!req.file) {
+            return res.status(400).json({ success: false, message: '没有接收到图片' });
+        }
+
+        if (!telegramBotToken || !telegramChatId) {
+            return res.status(500).json({ success: false, message: 'Telegram配置缺失' });
+        }
+
+        // 创建FormData来发送到Telegram API
+        const formData = new FormData();
+        formData.append('chat_id', telegramChatId);
+        formData.append('photo', new Blob([req.file.buffer]), req.file.originalname);
+        
+        // 如果需要添加图片说明
+        const caption = `代币价格快照 (${new Date().toLocaleString('zh-CN')})`;
+        formData.append('caption', caption);
+
+        // 发送到Telegram Bot API
+        const telegramResponse = await axios.post(
+            `https://api.telegram.org/bot${telegramBotToken}/sendPhoto`,
+            formData,
+            {
+                headers: {
+                    ...formData.getHeaders()
+                }
+            }
+        );
+
+        if (telegramResponse.data && telegramResponse.data.ok) {
+            res.json({ success: true, message: '图片已成功发送到Telegram' });
+        } else {
+            throw new Error('Telegram API 返回错误');
+        }
+    } catch (error) {
+        console.error('发送图片到Telegram失败:', error);
+        res.status(500).json({ 
+            success: false, 
+            message: `发送失败: ${error.message || '未知错误'}`
+        });
+    }
 });
 
 // 启动服务器

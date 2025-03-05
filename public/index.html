@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>代币价格走势图</title>
     <script src="https://cdn.jsdelivr.net/npm/echarts@5.4.3/dist/echarts.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
     <style>
         body {
             margin: 0;
@@ -37,11 +38,24 @@
             padding-bottom: 10px;
             border-bottom: 1px solid #eee;
             color: #333;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
         }
-        .refresh-button {
+        .section-title .update-time {
+            font-size: 14px;
+            color: #999;
+            font-weight: normal;
+        }
+        .action-buttons {
             position: fixed;
             right: 20px;
             bottom: 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+        .action-button {
             padding: 10px 20px;
             background-color: #1890ff;
             color: white;
@@ -51,23 +65,65 @@
             box-shadow: 0 2px 4px rgba(0,0,0,0.1);
             transition: all 0.3s;
         }
-        .refresh-button:hover {
+        .action-button:hover {
             background-color: #40a9ff;
         }
-        .refresh-button:active {
+        .action-button:active {
             background-color: #096dd9;
+        }
+        #screenshotBtn {
+            background-color: #52c41a;
+        }
+        #screenshotBtn:hover {
+            background-color: #73d13d;
+        }
+        #tgShareBtn {
+            background-color: #1d9bf0;
+        }
+        #tgShareBtn:hover {
+            background-color: #4cb5f9;
+        }
+        #loading-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0,0,0,0.5);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+            color: white;
+            font-size: 18px;
+            display: none;
         }
     </style>
 </head>
 <body>
     <div class="container">
-        <h2 class="section-title">链上MEME代币</h2>
+        <h2 class="section-title">
+            链上MEME代币
+            <span class="update-time" id="meme-update-time">暂无更新时间</span>
+        </h2>
         <div id="meme-charts-grid" class="charts-grid"></div>
         
-        <h2 class="section-title">币安主流币</h2>
+        <h2 class="section-title">
+            币安主流币
+            <span class="update-time" id="binance-update-time">暂无更新时间</span>
+        </h2>
         <div id="binance-charts-grid" class="charts-grid"></div>
     </div>
-    <button class="refresh-button" onclick="refreshData()">刷新数据</button>
+
+    <div class="action-buttons">
+        <button class="action-button" id="screenshotBtn">生成快照</button>
+        <button class="action-button" id="tgShareBtn">发送到Telegram</button>
+        <button class="action-button" id="refreshBtn">刷新数据</button>
+    </div>
+
+    <div id="loading-overlay">
+        <div>正在处理，请稍候...</div>
+    </div>
 
     <script>
         // 为代币预设颜色
@@ -319,6 +375,17 @@
             binance: {}
         };
 
+        // 格式化日期时间
+        function formatDateTime(date) {
+            const year = date.getFullYear();
+            const month = String(date.getMonth() + 1).padStart(2, '0');
+            const day = String(date.getDate()).padStart(2, '0');
+            const hours = String(date.getHours()).padStart(2, '0');
+            const minutes = String(date.getMinutes()).padStart(2, '0');
+            const seconds = String(date.getSeconds()).padStart(2, '0');
+            return `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`;
+        }
+
         async function fetchData() {
             try {
                 const response = await fetch('/api/prices');
@@ -350,6 +417,10 @@
                     const color = tokenColors[tokenName] || `rgb(${Math.floor(Math.random() * 255)}, ${Math.floor(Math.random() * 255)}, ${Math.floor(Math.random() * 255)})`;
                     chartInstances.meme[tokenName] = createChart('meme-charts-grid', tokenName, data[tokenName], color);
                 });
+
+                // 更新MEME代币数据更新时间
+                const memeUpdateTime = document.getElementById('meme-update-time');
+                memeUpdateTime.textContent = `更新时间: ${formatDateTime(new Date())}`;
             } catch (error) {
                 console.error('获取数据失败:', error);
             }
@@ -386,6 +457,10 @@
                     const color = binanceTokenColors[tokenName] || `rgb(${Math.floor(Math.random() * 255)}, ${Math.floor(Math.random() * 255)}, ${Math.floor(Math.random() * 255)})`;
                     chartInstances.binance[tokenName] = createChart('binance-charts-grid', tokenName, data[tokenName], color);
                 });
+
+                // 更新币安数据更新时间
+                const binanceUpdateTime = document.getElementById('binance-update-time');
+                binanceUpdateTime.textContent = `更新时间: ${formatDateTime(new Date())}`;
             } catch (error) {
                 console.error('获取币安数据失败:', error);
             }
@@ -393,12 +468,107 @@
 
         // 添加刷新函数
         async function refreshData() {
+            showLoading();
             await Promise.all([
                 fetchData(),
                 fetchBinanceData()
             ]);
+            hideLoading();
             console.log('数据已刷新');
         }
+
+        // 显示加载中遮罩
+        function showLoading() {
+            document.getElementById('loading-overlay').style.display = 'flex';
+        }
+
+        // 隐藏加载中遮罩
+        function hideLoading() {
+            document.getElementById('loading-overlay').style.display = 'none';
+        }
+
+        // 生成页面快照
+        async function takeScreenshot() {
+            showLoading();
+            try {
+                const container = document.querySelector('.container');
+                const canvas = await html2canvas(container, {
+                    scale: 1,
+                    logging: false,
+                    useCORS: true,
+                    allowTaint: true
+                });
+                
+                // 将canvas转换为图片并下载
+                const image = canvas.toDataURL('image/png');
+                const link = document.createElement('a');
+                link.href = image;
+                link.download = `代币价格快照_${formatDateTime(new Date()).replace(/[: ]/g, '_')}.png`;
+                link.click();
+            } catch (error) {
+                console.error('生成快照失败:', error);
+                alert('生成快照失败，请稍后重试');
+            } finally {
+                hideLoading();
+            }
+        }
+
+        // 发送快照到Telegram
+        async function sendToTelegram() {
+            showLoading();
+            try {
+                const container = document.querySelector('.container');
+                const canvas = await html2canvas(container, {
+                    scale: 1,
+                    logging: false,
+                    useCORS: true,
+                    allowTaint: true
+                });
+                
+                // 将canvas转换为blob
+                canvas.toBlob(async (blob) => {
+                    // 创建FormData对象
+                    const formData = new FormData();
+                    formData.append('image', blob, `代币价格快照_${formatDateTime(new Date()).replace(/[: ]/g, '_')}.png`);
+                    
+                    try {
+                        // 发送到服务器端点
+                        const response = await fetch('/api/send-to-telegram', {
+                            method: 'POST',
+                            body: formData
+                        });
+                        
+                        const result = await response.json();
+                        if (result.success) {
+                            alert('已成功发送到Telegram');
+                        } else {
+                            alert('发送失败: ' + result.message);
+                        }
+                    } catch (error) {
+                        console.error('发送到Telegram失败:', error);
+                        alert('发送失败，请稍后重试');
+                    } finally {
+                        hideLoading();
+                    }
+                }, 'image/png');
+            } catch (error) {
+                console.error('生成快照失败:', error);
+                alert('生成快照失败，请稍后重试');
+                hideLoading();
+            }
+        }
+
+        // 添加事件监听器
+        document.addEventListener('DOMContentLoaded', () => {
+            // 为截图按钮添加事件监听
+            document.getElementById('screenshotBtn').addEventListener('click', takeScreenshot);
+            
+            // 为TG分享按钮添加事件监听
+            document.getElementById('tgShareBtn').addEventListener('click', sendToTelegram);
+            
+            // 为刷新按钮添加事件监听
+            document.getElementById('refreshBtn').addEventListener('click', refreshData);
+        });
 
         // 初始加载
         fetchData();
