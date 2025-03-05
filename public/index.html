@@ -71,12 +71,6 @@
         .action-button:active {
             background-color: #096dd9;
         }
-        #screenshotBtn {
-            background-color: #52c41a;
-        }
-        #screenshotBtn:hover {
-            background-color: #73d13d;
-        }
         #tgShareBtn {
             background-color: #1d9bf0;
         }
@@ -98,6 +92,27 @@
             font-size: 18px;
             display: none;
         }
+        /* 为图表标题添加样式 */
+        .token-title {
+            display: flex;
+            justify-content: space-between;
+            align-items: baseline;
+            padding: 0 10px;
+        }
+        .token-name {
+            font-weight: bold;
+            font-size: 14px;
+        }
+        .token-percentage {
+            font-size: 14px;
+            font-weight: bold;
+        }
+        .positive {
+            color: #2ecc40;
+        }
+        .negative {
+            color: #ff4136;
+        }
     </style>
 </head>
 <body>
@@ -116,7 +131,6 @@
     </div>
 
     <div class="action-buttons">
-        <button class="action-button" id="screenshotBtn">生成快照</button>
         <button class="action-button" id="tgShareBtn">发送到Telegram</button>
         <button class="action-button" id="refreshBtn">刷新数据</button>
     </div>
@@ -210,16 +224,22 @@
             const option = {
                 title: {
                     text: tokenName,
+                    subtext: lastPercentage >= 0 ? `+${lastPercentage.toFixed(1)}%` : `${lastPercentage.toFixed(1)}%`,
                     left: 'center',
                     top: 0,
                     textStyle: {
+                        fontSize: 14,
+                        fontWeight: 'bold'
+                    },
+                    subtextStyle: {
+                        color: lastPercentage >= 0 ? '#2ecc40' : '#ff4136',
                         fontSize: 14,
                         fontWeight: 'bold'
                     }
                 },
                 grid: {
                     left: '25%',
-                    right: '5%',
+                    right: '10%',
                     top: '25%',
                     bottom: '15%'
                 },
@@ -230,7 +250,7 @@
                         const price = params[0].value[1];
                         return date.toLocaleDateString() + ' ' + 
                                date.toLocaleTimeString() + '<br/>' +
-                               `$${price.toFixed(4)}`;
+                               `$${price.toFixed(6)}`;
                     }
                 },
                 xAxis: {
@@ -239,36 +259,29 @@
                         show: true,
                         formatter: function(value) {
                             const date = new Date(value);
-                            return date.getMonth() + 1 + '/' + date.getDate();
+                            return (date.getMonth() + 1) + '/' + date.getDate();
                         },
                         fontSize: 10,
-                        showMinLabel: true,
-                        showMaxLabel: true,
+                        interval: 0,
+                        rotate: 0,
                         hideOverlap: true
                     },
                     axisTick: {
-                        show: false // 隐藏刻度线
+                        show: false
                     },
                     axisLine: {
-                        show: true // 保留轴线
+                        show: true
                     },
                     splitLine: {
-                        show: false // 隐藏分割线
-                    },
-                    // 只显示头尾两个标签
-                    interval: function(index, value) {
-                        return index === 0 || index === data.length - 1;
+                        show: false
                     }
                 },
                 yAxis: {
                     type: 'value',
-                    min: minPrice,
-                    max: maxPrice,
                     axisLabel: {
                         formatter: function(value) {
-                            // 根据价格大小调整显示格式
                             if (value < 0.001) {
-                                return '$' + value.toExponential(2);
+                                return '$' + value.toExponential(1);
                             } else if (value < 1) {
                                 return '$' + value.toFixed(4);
                             } else if (value < 10) {
@@ -279,16 +292,17 @@
                                 return '$' + Math.round(value);
                             }
                         },
-                        fontSize: 10,
-                        margin: 2 // 减小标签与轴的距离
+                        fontSize: 10
                     },
                     splitLine: {
                         show: true,
                         lineStyle: {
-                            type: 'dashed'
+                            type: 'dashed',
+                            opacity: 0.3
                         }
                     },
-                    // 减少Y轴刻度数量，避免拥挤
+                    min: minPrice,
+                    max: maxPrice,
                     splitNumber: 3
                 },
                 series: [{
@@ -315,28 +329,15 @@
                 }]
             };
             
-            // 在右上角添加百分比变化标签和价格
+            // 在右上角添加价格
             if (chartData.length > 0) {
                 option.graphic = [
-                    // 百分比变化
-                    {
-                        type: 'text',
-                        right: 10,
-                        top: 10,
-                        style: {
-                            text: lastPercentage >= 0 ? `+${lastPercentage.toFixed(1)}%` : `${lastPercentage.toFixed(1)}%`,
-                            fontSize: 14,
-                            fontWeight: 'bold',
-                            fill: lastPercentage >= 0 ? '#2ecc40' : '#ff4136'
-                        }
-                    },
-                    // 当前价格
                     {
                         type: 'text',
                         right: 10,
                         top: 30,
                         style: {
-                            text: `$${lastPrice.toFixed(4)}`,
+                            text: `$${lastPrice.toFixed(6)}`,
                             fontSize: 12,
                             fill: '#666'
                         }
@@ -487,45 +488,20 @@
             document.getElementById('loading-overlay').style.display = 'none';
         }
 
-        // 生成页面快照
-        async function takeScreenshot() {
-            showLoading();
-            try {
-                const container = document.querySelector('.container');
-                const canvas = await html2canvas(container, {
-                    scale: 1,
-                    logging: false,
-                    useCORS: true,
-                    allowTaint: true
-                });
-                
-                // 将canvas转换为图片并下载
-                const image = canvas.toDataURL('image/png');
-                const link = document.createElement('a');
-                link.href = image;
-                link.download = `代币价格快照_${formatDateTime(new Date()).replace(/[: ]/g, '_')}.png`;
-                link.click();
-            } catch (error) {
-                console.error('生成快照失败:', error);
-                alert('生成快照失败，请稍后重试');
-            } finally {
-                hideLoading();
-            }
-        }
-
         // 发送快照到Telegram
         async function sendToTelegram() {
             showLoading();
             try {
                 const container = document.querySelector('.container');
                 const canvas = await html2canvas(container, {
-                    scale: 1,
+                    scale: 2, // 提高图像质量
                     logging: false,
                     useCORS: true,
-                    allowTaint: true
+                    allowTaint: true,
+                    backgroundColor: '#ffffff'
                 });
                 
-                // 将canvas转换为blob
+                // 将canvas转换为blob并直接发送
                 canvas.toBlob(async (blob) => {
                     // 创建FormData对象
                     const formData = new FormData();
@@ -550,7 +526,7 @@
                     } finally {
                         hideLoading();
                     }
-                }, 'image/png');
+                }, 'image/png', 0.95); // 提高质量但稍微压缩
             } catch (error) {
                 console.error('生成快照失败:', error);
                 alert('生成快照失败，请稍后重试');
@@ -560,9 +536,6 @@
 
         // 添加事件监听器
         document.addEventListener('DOMContentLoaded', () => {
-            // 为截图按钮添加事件监听
-            document.getElementById('screenshotBtn').addEventListener('click', takeScreenshot);
-            
             // 为TG分享按钮添加事件监听
             document.getElementById('tgShareBtn').addEventListener('click', sendToTelegram);
             
