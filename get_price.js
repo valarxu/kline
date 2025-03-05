@@ -4,6 +4,7 @@ const express = require('express');
 const cors = require('cors');
 const cron = require('node-cron');
 const multer = require('multer');
+const FormData = require('form-data');
 require('dotenv').config();
 
 const app = express();
@@ -199,7 +200,7 @@ app.get('/api/binance-prices', (req, res) => {
     res.json(binanceTokenPricesData);
 });
 
-// 添加 Telegram 发送图片API
+// 修改 Telegram 发送图片API
 app.post('/api/send-to-telegram', upload.single('image'), async (req, res) => {
     try {
         if (!req.file) {
@@ -210,10 +211,14 @@ app.post('/api/send-to-telegram', upload.single('image'), async (req, res) => {
             return res.status(500).json({ success: false, message: 'Telegram配置缺失' });
         }
 
-        // 创建FormData来发送到Telegram API
+        // 使用 form-data 库创建表单
         const formData = new FormData();
         formData.append('chat_id', telegramChatId);
-        formData.append('photo', new Blob([req.file.buffer]), req.file.originalname);
+        // 直接使用 buffer，不需要 Blob
+        formData.append('photo', req.file.buffer, {
+            filename: req.file.originalname,
+            contentType: 'image/png'
+        });
         
         // 如果需要添加图片说明
         const caption = `代币价格快照 (${new Date().toLocaleString('zh-CN')})`;
@@ -224,9 +229,7 @@ app.post('/api/send-to-telegram', upload.single('image'), async (req, res) => {
             `https://api.telegram.org/bot${telegramBotToken}/sendPhoto`,
             formData,
             {
-                headers: {
-                    ...formData.getHeaders()
-                }
+                headers: formData.getHeaders() // 现在这个方法是有效的
             }
         );
 
