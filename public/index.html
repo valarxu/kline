@@ -239,7 +239,7 @@
                 },
                 grid: {
                     left: '25%',
-                    right: '10%',
+                    right: '5%',
                     top: '25%',
                     bottom: '15%'
                 },
@@ -250,7 +250,7 @@
                         const price = params[0].value[1];
                         return date.toLocaleDateString() + ' ' + 
                                date.toLocaleTimeString() + '<br/>' +
-                               `$${price.toFixed(6)}`;
+                               `$${price.toFixed(2)}`;
                     }
                 },
                 xAxis: {
@@ -498,7 +498,9 @@
                     logging: false,
                     useCORS: true,
                     allowTaint: true,
-                    backgroundColor: '#ffffff'
+                    backgroundColor: '#ffffff',
+                    width: 1800,
+                    height: 1000
                 });
                 
                 // 将canvas转换为blob并直接发送
