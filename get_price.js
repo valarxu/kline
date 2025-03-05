@@ -5,6 +5,7 @@ const cors = require('cors');
 const cron = require('node-cron');
 const multer = require('multer');
 const FormData = require('form-data');
+const puppeteer = require('puppeteer');
 require('dotenv').config();
 
 const app = express();
@@ -247,6 +248,98 @@ app.post('/api/send-to-telegram', upload.single('image'), async (req, res) => {
     }
 });
 
+// 添加自动截图并发送到Telegram的函数
+async function captureAndSendScreenshot() {
+    console.log('开始执行自动截图任务...');
+    
+    try {
+        // 1. 确保数据已更新
+        await Promise.all([
+            processTokens(),
+            processBinanceTokens()
+        ]);
+        
+        console.log('数据已更新，准备截图...');
+        
+        // 2. 启动无头浏览器
+        const browser = await puppeteer.launch({
+            args: ['--no-sandbox', '--disable-setuid-sandbox']
+        });
+        const page = await browser.newPage();
+        
+        // 3. 设置视口大小
+        await page.setViewport({
+            width: 1920,
+            height: 1600,
+            deviceScaleFactor: 1
+        });
+        
+        // 4. 访问页面并等待加载
+        const serverUrl = `http://localhost:${PORT}`;
+        await page.goto(serverUrl, {
+            waitUntil: 'networkidle0'
+        });
+        
+        // 5. 等待图表完全渲染
+        await page.waitForSelector('#meme-charts-grid .chart-item');
+        await page.waitForSelector('#binance-charts-grid .chart-item');
+        
+        // 额外等待确保图表完全渲染
+        await page.waitForTimeout(2000);
+        
+        // 6. 获取容器元素并截图
+        const containerSelector = '.container';
+        const container = await page.$(containerSelector);
+        
+        // 7. 截取页面内容
+        const screenshot = await container.screenshot({
+            type: 'png',
+            omitBackground: false
+        });
+        
+        console.log('截图已生成，准备发送到Telegram...');
+        
+        // 8. 关闭浏览器
+        await browser.close();
+        
+        // 9. 发送截图到Telegram
+        const formData = new FormData();
+        formData.append('chat_id', telegramChatId);
+        
+        // 创建当前日期时间字符串
+        const now = new Date();
+        const dateStr = now.toISOString().split('T')[0];
+        const timeStr = now.toTimeString().split(' ')[0];
+        const fileName = `代币价格快照_${dateStr}_${timeStr}.png`;
+        
+        formData.append('photo', screenshot, {
+            filename: fileName,
+            contentType: 'image/png'
+        });
+        
+        // 添加消息说明
+        const caption = `每日代币价格更新 (${now.toLocaleString('zh-CN')})`;
+        formData.append('caption', caption);
+        
+        // 发送到Telegram Bot API
+        const telegramResponse = await axios.post(
+            `https://api.telegram.org/bot${telegramBotToken}/sendPhoto`,
+            formData,
+            {
+                headers: formData.getHeaders()
+            }
+        );
+        
+        if (telegramResponse.data && telegramResponse.data.ok) {
+            console.log('每日截图已成功发送到Telegram');
+        } else {
+            throw new Error('Telegram API 返回错误');
+        }
+    } catch (error) {
+        console.error('自动截图并发送失败:', error);
+    }
+}
+
 // 启动服务器
 const PORT = process.env.PORT || 3040;
 app.listen(PORT, () => {
@@ -256,10 +349,21 @@ app.listen(PORT, () => {
     processTokens();
     processBinanceTokens();
     
-    // 使用 cron 设置定时任务，每4小时执行一次
+    // 使用 cron 设置定时任务
+    
+    // 每4小时更新一次数据
     cron.schedule('0 */4 * * *', () => {
         console.log('执行定时任务：更新价格数据');
         processTokens();
         processBinanceTokens();
     });
+    
+    // 每天早上8点自动截图并发送到Telegram
+    cron.schedule('0 8 * * *', () => {
+        console.log('执行定时任务：生成每日截图');
+        captureAndSendScreenshot();
+    });
+    
+    // 可选：服务启动后测试一次截图功能
+    // captureAndSendScreenshot();
 }); 
