@@ -488,47 +488,89 @@
             document.getElementById('loading-overlay').style.display = 'none';
         }
 
-        // 发送快照到Telegram
+        // 发送快照到Telegram - 完全重写以解决渲染问题
         async function sendToTelegram() {
             showLoading();
             try {
-                // 强制重新渲染所有图表以确保完整性
-                Object.values(chartInstances.meme).forEach(chart => chart.resize());
-                Object.values(chartInstances.binance).forEach(chart => chart.resize());
-                
-                // 等待图表完全渲染
-                await new Promise(resolve => setTimeout(resolve, 500));
-                
                 const container = document.querySelector('.container');
                 
-                // 获取容器实际尺寸
-                const containerWidth = container.offsetWidth;
-                const containerHeight = container.offsetHeight;
+                // 1. 创建容器副本以避免修改原始DOM
+                const clonedContainer = container.cloneNode(true);
+                clonedContainer.style.position = 'absolute';
+                clonedContainer.style.left = '-9999px';
+                clonedContainer.style.width = container.offsetWidth + 'px';
+                document.body.appendChild(clonedContainer);
                 
+                // 2. 重新获取每个图表的尺寸
+                const memeCharts = document.querySelectorAll('#meme-charts-grid .chart-item');
+                const binanceCharts = document.querySelectorAll('#binance-charts-grid .chart-item');
+                
+                const itemWidth = memeCharts.length > 0 ? memeCharts[0].offsetWidth : 0;
+                const itemHeight = memeCharts.length > 0 ? memeCharts[0].offsetHeight : 0;
+                
+                // 3. 等待主图表完全渲染
+                await new Promise(resolve => setTimeout(resolve, 1000));
+                
+                // 4. 强制重新渲染所有图表
+                Object.values(chartInstances.meme).forEach(chart => {
+                    chart.resize();
+                    chart.setOption(chart.getOption());
+                });
+                Object.values(chartInstances.binance).forEach(chart => {
+                    chart.resize();
+                    chart.setOption(chart.getOption());
+                });
+                
+                // 5. 再次等待渲染完成
+                await new Promise(resolve => setTimeout(resolve, 500));
+                
+                // 6. 确保每个图表容器有明确的宽高
+                document.querySelectorAll('.chart-item').forEach(item => {
+                    item.style.width = itemWidth + 'px';
+                    item.style.height = itemHeight + 'px';
+                    item.style.overflow = 'visible'; // 防止内容被裁剪
+                });
+                
+                // 7. 确保 grid 布局不会挤压图表
+                document.querySelectorAll('.charts-grid').forEach(grid => {
+                    grid.style.gridTemplateColumns = `repeat(8, ${itemWidth}px)`;
+                });
+                
+                // 8. 进行截图，使用更多参数确保正确捕获
                 const canvas = await html2canvas(container, {
                     scale: 2,
-                    logging: false,
+                    logging: true, // 临时开启日志以便调试
                     useCORS: true,
                     allowTaint: true,
                     backgroundColor: '#ffffff',
-                    width: containerWidth,
-                    height: containerHeight,
-                    windowWidth: containerWidth,
-                    windowHeight: containerHeight,
-                    // 确保捕获整个内容即使超出视口
-                    ignoreElements: (element) => {
-                        return false; // 不忽略任何元素
+                    width: container.offsetWidth,
+                    height: container.offsetHeight,
+                    windowWidth: document.documentElement.offsetWidth,
+                    windowHeight: document.documentElement.offsetHeight,
+                    scrollX: window.scrollX,
+                    scrollY: window.scrollY,
+                    // 减少字体混淆
+                    letterRendering: true,
+                    // 提高渲染质量
+                    imageTimeout: 0,
+                    // 确保所有内容都被捕获
+                    ignoreElements: (element) => false,
+                    onclone: function(clonedDoc) {
+                        // 在克隆文档上进行额外处理，确保图表尺寸正确
+                        const clonedCharts = clonedDoc.querySelectorAll('.chart-item');
+                        clonedCharts.forEach(chart => {
+                            chart.style.width = itemWidth + 'px';
+                            chart.style.height = itemHeight + 'px';
+                        });
                     }
                 });
                 
-                // 将canvas转换为blob并直接发送
+                // 9. 将canvas转换为blob并发送
                 canvas.toBlob(async (blob) => {
-                    // 创建FormData对象
                     const formData = new FormData();
                     formData.append('image', blob, `代币价格快照_${formatDateTime(new Date()).replace(/[: ]/g, '_')}.png`);
                     
                     try {
-                        // 发送到服务器端点
                         const response = await fetch('/api/send-to-telegram', {
                             method: 'POST',
                             body: formData
@@ -544,9 +586,13 @@
                         console.error('发送到Telegram失败:', error);
                         alert('发送失败，请稍后重试');
                     } finally {
+                        // 10. 清理临时DOM元素
+                        if (document.body.contains(clonedContainer)) {
+                            document.body.removeChild(clonedContainer);
+                        }
                         hideLoading();
                     }
-                }, 'image/png', 1.0); // 使用最高质量
+                }, 'image/png', 1.0);
             } catch (error) {
                 console.error('生成快照失败:', error);
                 alert('生成快照失败，请稍后重试');
