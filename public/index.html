@@ -492,15 +492,33 @@
         async function sendToTelegram() {
             showLoading();
             try {
+                // 强制重新渲染所有图表以确保完整性
+                Object.values(chartInstances.meme).forEach(chart => chart.resize());
+                Object.values(chartInstances.binance).forEach(chart => chart.resize());
+                
+                // 等待图表完全渲染
+                await new Promise(resolve => setTimeout(resolve, 500));
+                
                 const container = document.querySelector('.container');
+                
+                // 获取容器实际尺寸
+                const containerWidth = container.offsetWidth;
+                const containerHeight = container.offsetHeight;
+                
                 const canvas = await html2canvas(container, {
-                    scale: 2, // 提高图像质量
+                    scale: 2,
                     logging: false,
                     useCORS: true,
                     allowTaint: true,
                     backgroundColor: '#ffffff',
-                    width: 1800,
-                    height: 1000
+                    width: containerWidth,
+                    height: containerHeight,
+                    windowWidth: containerWidth,
+                    windowHeight: containerHeight,
+                    // 确保捕获整个内容即使超出视口
+                    ignoreElements: (element) => {
+                        return false; // 不忽略任何元素
+                    }
                 });
                 
                 // 将canvas转换为blob并直接发送
@@ -528,7 +546,7 @@
                     } finally {
                         hideLoading();
                     }
-                }, 'image/png', 0.95); // 提高质量但稍微压缩
+                }, 'image/png', 1.0); // 使用最高质量
             } catch (error) {
                 console.error('生成快照失败:', error);
                 alert('生成快照失败，请稍后重试');
