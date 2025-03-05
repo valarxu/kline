@@ -192,13 +192,27 @@ async function processBinanceTokens() {
     }
 }
 
-// API路由
-app.get('/api/prices', (req, res) => {
-    res.json(okxTokenPricesData);
+// 修改API路由 - 直接执行数据获取
+app.get('/api/prices', async (req, res) => {
+    try {
+        // 执行数据获取，然后返回最新数据
+        await processTokens();
+        res.json(okxTokenPricesData);
+    } catch (error) {
+        console.error('获取OKX代币数据失败:', error);
+        res.status(500).json({ error: '获取数据时发生错误' });
+    }
 });
 
-app.get('/api/binance-prices', (req, res) => {
-    res.json(binanceTokenPricesData);
+app.get('/api/binance-prices', async (req, res) => {
+    try {
+        // 执行数据获取，然后返回最新数据
+        await processBinanceTokens();
+        res.json(binanceTokenPricesData);
+    } catch (error) {
+        console.error('获取Binance代币数据失败:', error);
+        res.status(500).json({ error: '获取数据时发生错误' });
+    }
 });
 
 // 修改 Telegram 发送图片API
@@ -345,20 +359,17 @@ const PORT = process.env.PORT || 3040;
 app.listen(PORT, () => {
     console.log(`服务器运行在 http://localhost:${PORT}`);
     
-    // 启动后立即获取数据
-    processTokens();
-    processBinanceTokens();
-    
-    // 使用 cron 设置定时任务
-    
-    // 每4小时更新一次数据
-    cron.schedule('0 */4 * * *', () => {
-        console.log('执行定时任务：更新价格数据');
-        processTokens();
-        processBinanceTokens();
+    // 启动时获取一次初始数据
+    Promise.all([
+        processTokens(),
+        processBinanceTokens()
+    ]).then(() => {
+        console.log('初始数据加载完成');
+    }).catch(error => {
+        console.error('初始数据加载失败:', error);
     });
     
-    // 每天早上8点自动截图并发送到Telegram
+    // 只保留每天早上8点自动截图并发送到Telegram的任务
     cron.schedule('0 8 * * *', () => {
         console.log('执行定时任务：生成每日截图');
         captureAndSendScreenshot();
