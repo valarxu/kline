@@ -297,7 +297,7 @@ app.post('/api/send-to-telegram', upload.single('image'), async (req, res) => {
     }
 });
 
-// 替代自动截图功能的新函数
+// 修改图表生成函数，确保正确处理日期
 async function generateChartsAndSendToTelegram() {
     console.log('开始执行自动图表生成任务...');
     
@@ -312,8 +312,15 @@ async function generateChartsAndSendToTelegram() {
         
         // 2. 创建大型画布
         const width = 1800;
-        const height = 2000;
-        const chartJSNodeCanvas = new ChartJSNodeCanvas({ width, height, backgroundColour: '#ffffff' });
+        const height = 2400;
+        const chartJSNodeCanvas = new ChartJSNodeCanvas({ 
+            width, 
+            height, 
+            backgroundColour: '#ffffff',
+            plugins: {
+                modern: ['chartjs-adapter-date-fns']
+            }
+        });
         
         // 3. 创建主画布
         const mainCanvas = createCanvas(width, height);
@@ -336,18 +343,22 @@ async function generateChartsAndSendToTelegram() {
         // 获取并排序代币数据
         const memeTokenChanges = {};
         Object.entries(okxTokenPricesData).forEach(([tokenName, prices]) => {
-            if (prices.length > 0) {
-                const sortedPrices = [...prices].sort((a, b) => parseInt(a.time) - parseInt(b.time));
-                const firstPrice = parseFloat(sortedPrices[0].price);
-                const lastPrice = parseFloat(sortedPrices[sortedPrices.length - 1].price);
-                const percentageChange = ((lastPrice - firstPrice) / firstPrice) * 100;
-                memeTokenChanges[tokenName] = {
-                    change: percentageChange,
-                    prices: sortedPrices.map(item => ({
-                        time: parseInt(item.time),
-                        price: parseFloat(item.price)
-                    }))
-                };
+            if (prices && prices.length > 0) {
+                try {
+                    const sortedPrices = [...prices].sort((a, b) => parseInt(a.time) - parseInt(b.time));
+                    const firstPrice = parseFloat(sortedPrices[0].price);
+                    const lastPrice = parseFloat(sortedPrices[sortedPrices.length - 1].price);
+                    const percentageChange = ((lastPrice - firstPrice) / firstPrice) * 100;
+                    memeTokenChanges[tokenName] = {
+                        change: percentageChange,
+                        prices: sortedPrices.map(item => ({
+                            time: new Date(parseInt(item.time)),
+                            price: parseFloat(item.price)
+                        }))
+                    };
+                } catch (err) {
+                    console.error(`处理${tokenName}数据时出错:`, err);
+                }
             }
         });
         
@@ -368,96 +379,247 @@ async function generateChartsAndSendToTelegram() {
         let col = 0;
         
         for (const token of sortedMemeTokens.slice(0, 16)) { // 限制为16个代币
-            const chartData = token.prices.map(item => ({
-                x: item.time,
-                y: item.price
-            }));
-            
-            const color = tokenColors[token.name] || `rgb(${Math.floor(Math.random() * 255)}, ${Math.floor(Math.random() * 255)}, ${Math.floor(Math.random() * 255)})`;
-            
-            // 创建单个图表
-            const chartConfig = {
-                type: 'line',
-                data: {
-                    datasets: [{
-                        label: token.name,
-                        data: chartData,
-                        borderColor: color,
-                        backgroundColor: color.replace('rgb', 'rgba').replace(')', ', 0.2)'),
-                        fill: true,
-                        tension: 0.1
-                    }]
-                },
-                options: {
-                    responsive: false,
-                    plugins: {
-                        title: {
-                            display: true,
-                            text: `${token.name} (${token.change >= 0 ? '+' : ''}${token.change.toFixed(1)}%)`,
-                            color: token.change >= 0 ? '#2ecc40' : '#ff4136'
-                        },
-                        legend: {
-                            display: false
-                        }
+            try {
+                const chartData = token.prices.map(item => ({
+                    x: item.time,
+                    y: item.price
+                }));
+                
+                const color = tokenColors[token.name] || `rgb(${Math.floor(Math.random() * 255)}, ${Math.floor(Math.random() * 255)}, ${Math.floor(Math.random() * 255)})`;
+                
+                // 创建单个图表
+                const chartConfig = {
+                    type: 'line',
+                    data: {
+                        datasets: [{
+                            label: token.name,
+                            data: chartData,
+                            borderColor: color,
+                            backgroundColor: color.replace('rgb', 'rgba').replace(')', ', 0.2)'),
+                            fill: true,
+                            tension: 0.1
+                        }]
                     },
-                    scales: {
-                        x: {
-                            type: 'time',
-                            time: {
-                                unit: 'day'
+                    options: {
+                        responsive: false,
+                        plugins: {
+                            title: {
+                                display: true,
+                                text: `${token.name} (${token.change >= 0 ? '+' : ''}${token.change.toFixed(1)}%)`,
+                                color: token.change >= 0 ? '#2ecc40' : '#ff4136'
+                            },
+                            legend: {
+                                display: false
                             }
                         },
-                        y: {
-                            ticks: {
-                                callback: (value) => '$' + value.toFixed(4)
+                        scales: {
+                            x: {
+                                type: 'time',
+                                time: {
+                                    unit: 'day',
+                                    displayFormats: {
+                                        day: 'MM/dd'
+                                    }
+                                },
+                                ticks: {
+                                    maxRotation: 0
+                                }
+                            },
+                            y: {
+                                ticks: {
+                                    callback: (value) => '$' + value.toFixed(4)
+                                }
                             }
                         }
                     }
+                };
+                
+                const chartImage = await chartJSNodeCanvas.renderToBuffer(chartConfig);
+                const chartImg = new Image();
+                chartImg.onload = () => {
+                    const xPos = 20 + col * (chartWidth + 20);
+                    const yPos = 60 + row * (chartHeight + 30);
+                    mainCtx.drawImage(chartImg, xPos, yPos, chartWidth, chartHeight);
+                };
+                chartImg.onerror = (err) => {
+                    console.error(`加载${token.name}图表图片失败:`, err);
+                };
+                chartImg.src = chartImage;
+                
+                // 等待图片加载
+                await new Promise((resolve) => {
+                    if (chartImg.complete) {
+                        const xPos = 20 + col * (chartWidth + 20);
+                        const yPos = 60 + row * (chartHeight + 30);
+                        mainCtx.drawImage(chartImg, xPos, yPos, chartWidth, chartHeight);
+                        resolve();
+                    } else {
+                        chartImg.onload = () => {
+                            const xPos = 20 + col * (chartWidth + 20);
+                            const yPos = 60 + row * (chartHeight + 30);
+                            mainCtx.drawImage(chartImg, xPos, yPos, chartWidth, chartHeight);
+                            resolve();
+                        };
+                        chartImg.onerror = () => {
+                            console.error(`加载${token.name}图表图片失败`);
+                            resolve();
+                        };
+                    }
+                });
+                
+                col++;
+                if (col >= cols) {
+                    col = 0;
+                    row++;
                 }
-            };
-            
-            const chartImage = await chartJSNodeCanvas.renderToBuffer(chartConfig);
-            const chartImg = new Image();
-            chartImg.src = chartImage;
-            
-            const xPos = 20 + col * (chartWidth + 20);
-            const yPos = 60 + row * (chartHeight + 30);
-            
-            mainCtx.drawImage(chartImg, xPos, yPos, chartWidth, chartHeight);
-            
-            col++;
-            if (col >= cols) {
-                col = 0;
-                row++;
+            } catch (err) {
+                console.error(`绘制${token.name}图表时出错:`, err);
             }
         }
         
         // 6. 添加币安主流币标题
+        const binanceStartY = row * (chartHeight + 30) + 120;
         mainCtx.fillStyle = '#333333';
         mainCtx.font = 'bold 32px Arial';
-        mainCtx.fillText('币安主流币', 20, row * (chartHeight + 30) + 120);
+        mainCtx.fillText('币安主流币', 20, binanceStartY);
         
         // 添加更新时间
         mainCtx.font = '18px Arial';
         mainCtx.fillStyle = '#999999';
-        mainCtx.fillText(updateTime, width - 400, row * (chartHeight + 30) + 120);
+        mainCtx.fillText(updateTime, width - 400, binanceStartY);
         
-        // 处理币安数据，类似上面的处理
+        // 7. 处理币安数据
         const binanceTokenChanges = {};
-        // ... 省略与MEME代币类似的处理逻辑 ...
+        Object.entries(binanceTokenPricesData).forEach(([tokenName, prices]) => {
+            if (prices && prices.length > 0) {
+                try {
+                    const sortedPrices = [...prices].sort((a, b) => parseInt(a.time) - parseInt(b.time));
+                    const firstPrice = parseFloat(sortedPrices[0].price);
+                    const lastPrice = parseFloat(sortedPrices[sortedPrices.length - 1].price);
+                    const percentageChange = ((lastPrice - firstPrice) / firstPrice) * 100;
+                    binanceTokenChanges[tokenName] = {
+                        change: percentageChange,
+                        prices: sortedPrices.map(item => ({
+                            time: new Date(parseInt(item.time)),
+                            price: parseFloat(item.price)
+                        }))
+                    };
+                } catch (err) {
+                    console.error(`处理币安${tokenName}数据时出错:`, err);
+                }
+            }
+        });
         
-        // 7. 最后将整个画布转换为Buffer
+        // 按涨跌幅排序
+        const sortedBinanceTokens = Object.entries(binanceTokenChanges)
+            .sort((a, b) => b[1].change - a[1].change)
+            .map(([token, data]) => ({ 
+                name: token, 
+                change: data.change, 
+                prices: data.prices 
+            }));
+        
+        // 8. 绘制币安代币图表
+        row = 0; // 重置行计数
+        col = 0; // 重置列计数
+        
+        for (const token of sortedBinanceTokens.slice(0, 16)) { // 限制为16个代币
+            try {
+                const chartData = token.prices.map(item => ({
+                    x: item.time,
+                    y: item.price
+                }));
+                
+                // 为币安代币使用不同的颜色
+                const color = `rgb(${Math.floor(Math.random() * 200)}, ${Math.floor(Math.random() * 200)}, ${Math.floor(Math.random() * 200)})`;
+                
+                // 创建单个图表配置
+                const chartConfig = {
+                    type: 'line',
+                    data: {
+                        datasets: [{
+                            label: token.name,
+                            data: chartData,
+                            borderColor: color,
+                            backgroundColor: color.replace('rgb', 'rgba').replace(')', ', 0.2)'),
+                            fill: true,
+                            tension: 0.1
+                        }]
+                    },
+                    options: {
+                        responsive: false,
+                        plugins: {
+                            title: {
+                                display: true,
+                                text: `${token.name} (${token.change >= 0 ? '+' : ''}${token.change.toFixed(1)}%)`,
+                                color: token.change >= 0 ? '#2ecc40' : '#ff4136'
+                            },
+                            legend: {
+                                display: false
+                            }
+                        },
+                        scales: {
+                            x: {
+                                type: 'time',
+                                time: {
+                                    unit: 'day',
+                                    displayFormats: {
+                                        day: 'MM/dd'
+                                    }
+                                },
+                                ticks: {
+                                    maxRotation: 0
+                                }
+                            },
+                            y: {
+                                ticks: {
+                                    callback: (value) => '$' + value.toFixed(2)
+                                }
+                            }
+                        }
+                    }
+                };
+                
+                const chartImage = await chartJSNodeCanvas.renderToBuffer(chartConfig);
+                const chartImg = new Image();
+                
+                // 等待图片加载
+                await new Promise((resolve) => {
+                    chartImg.onload = () => {
+                        const xPos = 20 + col * (chartWidth + 20);
+                        const yPos = binanceStartY + 40 + row * (chartHeight + 30);
+                        mainCtx.drawImage(chartImg, xPos, yPos, chartWidth, chartHeight);
+                        resolve();
+                    };
+                    chartImg.onerror = () => {
+                        console.error(`加载币安${token.name}图表图片失败`);
+                        resolve();
+                    };
+                    chartImg.src = chartImage;
+                });
+                
+                col++;
+                if (col >= cols) {
+                    col = 0;
+                    row++;
+                }
+            } catch (err) {
+                console.error(`绘制币安${token.name}图表时出错:`, err);
+            }
+        }
+        
+        // 9. 将整个画布转换为Buffer
         const buffer = mainCanvas.toBuffer('image/png');
         
         console.log('图表已生成，准备发送到Telegram...');
         
-        // 8. 发送图片到Telegram
+        // 10. 发送图片到Telegram
         const formData = new FormData();
         formData.append('chat_id', telegramChatId);
         
         const now = new Date();
         const dateStr = now.toISOString().split('T')[0];
-        const timeStr = now.toTimeString().split(' ')[0];
+        const timeStr = now.toTimeString().split(' ')[0].replace(/:/g, '-');
         const fileName = `代币价格快照_${dateStr}_${timeStr}.png`;
         
         formData.append('photo', buffer, {

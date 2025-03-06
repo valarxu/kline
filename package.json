@@ -16,6 +16,11 @@
     "puppeteer": "^19.5.2",
     "canvas": "^2.11.2",
     "chart.js": "^4.4.1",
-    "chartjs-node-canvas": "^4.1.6"
+    "chartjs-node-canvas": "^4.1.6",
+    "chartjs-adapter-date-fns": "^3.0.0",
+    "date-fns": "^2.30.0"
+  },
+  "scripts": {
+    "start": "node get_price.js"
   }
 }
