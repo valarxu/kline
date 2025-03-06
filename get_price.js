@@ -687,11 +687,11 @@ app.listen(PORT, () => {
     });
     
     // 只保留每天早上8点自动截图并发送到Telegram的任务
-    cron.schedule('0 8 * * *', () => {
-        console.log('执行定时任务：生成每日图表');
-        generateChartsAndSendToTelegram();
-    });
+    // cron.schedule('0 8 * * *', () => {
+    //     console.log('执行定时任务：生成每日图表');
+    //     generateChartsAndSendToTelegram();
+    // });
     
     // 可选：服务启动后测试一次截图功能
-    generateChartsAndSendToTelegram();
+    // generateChartsAndSendToTelegram();
 }); 
