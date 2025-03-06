@@ -5,7 +5,7 @@ const cors = require('cors');
 const cron = require('node-cron');
 const multer = require('multer');
 const FormData = require('form-data');
-const { createCanvas, registerFont } = require('canvas');
+const { createCanvas, registerFont, Image } = require('canvas');
 const Chart = require('chart.js/auto');
 require('chartjs-adapter-date-fns');
 const { ChartJSNodeCanvas } = require('chartjs-node-canvas');
