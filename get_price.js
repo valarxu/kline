@@ -64,6 +64,38 @@ const upload = multer({ storage: storage });
 const telegramBotToken = process.env.TELEGRAM_BOT_TOKEN;
 const telegramChatId = process.env.TELEGRAM_CHAT_ID;
 
+// 添加日期时间格式化函数
+function formatDateTime(date) {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    const hours = String(date.getHours()).padStart(2, '0');
+    const minutes = String(date.getMinutes()).padStart(2, '0');
+    const seconds = String(date.getSeconds()).padStart(2, '0');
+    
+    return `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`;
+}
+
+// 添加代币颜色配置
+const tokenColors = {
+    'swarms': 'rgb(255, 99, 132)',
+    'arc': 'rgb(54, 162, 235)',
+    'pippin': 'rgb(75, 192, 192)',
+    'LUMO': 'rgb(153, 102, 255)',
+    'ACT': 'rgb(255, 159, 64)',
+    'GOAT': 'rgb(255, 99, 71)',
+    'Fartcoin': 'rgb(50, 205, 50)',
+    'SNAI': 'rgb(0, 128, 128)',
+    'GRIFFAIN': 'rgb(255, 215, 0)',
+    'BUZZ': 'rgb(128, 0, 128)',
+    'listen': 'rgb(0, 191, 255)',
+    'AVA': 'rgb(220, 20, 60)',
+    'STONKS': 'rgb(46, 139, 87)',
+    'pnut': 'rgb(210, 105, 30)',
+    'ai16z': 'rgb(0, 0, 205)',
+    'Trump': 'rgb(178, 34, 34)'
+};
+
 // 生成签名
 function sign(timestamp, method, requestPath, body = '') {
     const message = timestamp + method + requestPath + body;
@@ -499,5 +531,5 @@ app.listen(PORT, () => {
     });
     
     // 可选：服务启动后测试一次截图功能
-    // captureAndSendScreenshot();
+    generateChartsAndSendToTelegram();
 }); 
