@@ -15,9 +15,9 @@
     "node-cron": "^3.0.3",
     "puppeteer": "^19.5.2",
     "canvas": "^2.11.2",
-    "chart.js": "^4.4.1",
+    "chart.js": "^3.9.1",
     "chartjs-node-canvas": "^4.1.6",
-    "chartjs-adapter-date-fns": "^3.0.0",
+    "chartjs-adapter-date-fns": "^2.0.0",
     "date-fns": "^2.30.0"
   },
   "scripts": {
