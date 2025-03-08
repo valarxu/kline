@@ -223,19 +223,8 @@
             
             const option = {
                 title: {
-                    text: tokenName,
-                    subtext: lastPercentage >= 0 ? `+${lastPercentage.toFixed(1)}%` : `${lastPercentage.toFixed(1)}%`,
-                    left: 'center',
-                    top: 0,
-                    textStyle: {
-                        fontSize: 14,
-                        fontWeight: 'bold'
-                    },
-                    subtextStyle: {
-                        color: lastPercentage >= 0 ? '#2ecc40' : '#ff4136',
-                        fontSize: 14,
-                        fontWeight: 'bold'
-                    }
+                    text: '',  // 移除标题，我们将使用自定义图形元素
+                    show: false
                 },
                 grid: {
                     left: '25%',
@@ -250,7 +239,7 @@
                         const price = params[0].value[1];
                         return date.toLocaleDateString() + ' ' + 
                                date.toLocaleTimeString() + '<br/>' +
-                               `$${price.toFixed(2)}`;
+                               `$${price.toFixed(4)}`;
                     }
                 },
                 xAxis: {
@@ -329,16 +318,45 @@
                 }]
             };
             
-            // 在右上角添加价格
+            // 替换原有的标题配置，添加自定义图形元素
             if (chartData.length > 0) {
+                const lastPrice = chartData[chartData.length - 1][1];
+                const percentageText = lastPercentage >= 0 ? `+${lastPercentage.toFixed(1)}%` : `${lastPercentage.toFixed(1)}%`;
+                const percentageColor = lastPercentage >= 0 ? '#2ecc40' : '#ff4136';
+                
                 option.graphic = [
+                    // 代币名称
+                    {
+                        type: 'text',
+                        left: 10,
+                        top: 10,
+                        style: {
+                            text: tokenName,
+                            fontSize: 14,
+                            fontWeight: 'bold',
+                            fill: '#333'
+                        }
+                    },
+                    // 涨跌幅
+                    {
+                        type: 'text',
+                        left: 'center',
+                        top: 10,
+                        style: {
+                            text: percentageText,
+                            fontSize: 14,
+                            fontWeight: 'bold',
+                            fill: percentageColor
+                        }
+                    },
+                    // 价格
                     {
                         type: 'text',
                         right: 10,
-                        top: 30,
+                        top: 10,
                         style: {
-                            text: `$${lastPrice.toFixed(2)}`,
-                            fontSize: 12,
+                            text: `$${lastPrice.toFixed(4)}`,
+                            fontSize: 14,
                             fill: '#666'
                         }
                     }
